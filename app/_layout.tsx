@@ -1,13 +1,18 @@
-import React from "react";
-import { Text } from "react-native";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Inter_400Regular, Inter_700Bold } from "@expo-google-fonts/inter";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import React from "react";
+import { Text } from "react-native";
 import "react-native-reanimated";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useFonts } from "expo-font";
-import { Inter_400Regular, Inter_700Bold } from "@expo-google-fonts/inter";
-
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import "../global.css";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
@@ -29,26 +34,28 @@ export default function RootLayout() {
   };
 
   return (
-    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          // ⚠️ React Navigation headers cannot use Tailwind className —
-          // these must stay as plain style objects
-          headerTitleStyle: { fontFamily: "Inter_700Bold", fontSize: 18 },
-          headerStyle: {
-            backgroundColor: isDark ? "#000000" : "#ffffff",
-          },
-          headerTintColor: isDark ? "#ffffff" : "#000000",
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
-        />
-      </Stack>
+    <SafeAreaProvider>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <Stack
+          screenOptions={{
+            // ⚠️ React Navigation headers cannot use Tailwind className —
+            // these must stay as plain style objects
+            headerTitleStyle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+            headerStyle: {
+              backgroundColor: isDark ? "#000000" : "#ffffff",
+            },
+            headerTintColor: isDark ? "#ffffff" : "#000000",
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", title: "Modal" }}
+          />
+        </Stack>
 
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </ThemeProvider>
+        <StatusBar style={isDark ? "light" : "dark"} />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

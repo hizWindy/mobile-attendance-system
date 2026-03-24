@@ -1,8 +1,8 @@
 import { Tabs } from "expo-router";
 import React from "react";
 
-import CustomHeader from "@/components/layout/CustomHeader";
 import { HapticTab } from "@/components/haptic-tab";
+import CustomHeader from "@/components/layout/CustomHeader";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,7 +22,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          header: () => <CustomHeader />,
+          header: () => (
+            <CustomHeader
+              notificationCount={5}
+              onNotificationPress={() => console.log("notifications pressed")}
+            />
+          ),
           headerShown: true,
           title: "Home",
           tabBarIcon: ({ color }) => (
@@ -38,7 +43,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="sessions"
         options={{
-          header: () => <CustomHeader />,
+          header: () => (
+            <CustomHeader
+              notificationCount={2}
+              onNotificationPress={() => console.log("notifications pressed")}
+            />
+          ),
           headerShown: true,
           title: "Sessions",
           tabBarIcon: ({ color }) => (
