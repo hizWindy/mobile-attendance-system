@@ -22,15 +22,14 @@ export const SearchSessions: React.FC<SearchSessionsProps> = ({
 
   return (
     <View
-      className="flex-row items-center bg-white rounded-xl shadow-lg px-4 py-2 mx-4 my-2"
+      className="flex-row items-center bg-white rounded-xl shadow-lg px-4  mx-4 my-2"
       style={{
         width,
         height,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
-        elevation: 6, // Android shadow
       }}
     >
       <MaterialCommunityIcons

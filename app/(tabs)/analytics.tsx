@@ -1,8 +1,12 @@
+import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 const AnalyticsScreen = () => {
+  const [activeTab, setActiveTab] = useState<"attendee" | "supervisor">(
+    "attendee",
+  );
   const [analytics] = useState({
     totalAttendance: 145,
     attendanceRate: 92.5,
@@ -25,7 +29,18 @@ const AnalyticsScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Analytics</Text>
+      <SegmentedTab
+        options={[
+          { key: "attendee", label: "Attendee" },
+          { key: "supervisor", label: "Supervisor" },
+        ]}
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as "attendee" | "supervisor")}
+      />
+
+      <Text style={styles.subHeader}>
+        {activeTab === "attendee" ? "Attendee Overview" : "Supervisor Overview"}
+      </Text>
 
       <View style={styles.statsContainer}>
         <StatCard
@@ -134,6 +149,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     marginTop: 12,
+  },
+  subHeader: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#1f4d7a",
   },
   chartSubText: {
     fontSize: 12,
