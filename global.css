@@ -1,0 +1,4 @@
+/* global.css — must be in root, NOT inside /app */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
