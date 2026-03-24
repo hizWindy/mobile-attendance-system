@@ -2,6 +2,7 @@ import { Activity } from "@/components/activity/ActivityItem";
 import { RecentActivity } from "@/components/activity/RecentActivity";
 import { CheckInButton } from "@/components/button/CheckInButton";
 import { SupervisorCreateSessionButton } from "@/components/button/SupervisorCreateSessionButton";
+import { ActivityModal } from "@/components/modal/ActivityModal";
 import { CheckInModal } from "@/components/modal/CheckInModal";
 import { CreateSessionModal } from "@/components/modal/CreateSessionModal";
 import { SearchSessions } from "@/components/search/SearchSessions";
@@ -89,6 +90,11 @@ export default function HomeScreen() {
     "attendee",
   );
 
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null,
+  );
+  const [activityModalVisible, setActivityModalVisible] = useState(false);
+
   const [sessions, setSessions] = useState(["ABC123", "DEF456", "GHI789"]);
   const [upcomingSessions, setUpcomingSessions] =
     useState<Session[]>(SAMPLE_SESSIONS);
@@ -118,9 +124,9 @@ export default function HomeScreen() {
   };
 
   const handleActivityPress = (activity: Activity) => {
-    console.log("Activity pressed:", activity);
+    setSelectedActivity(activity);
+    setActivityModalVisible(true);
   };
-
   const handleSeeAllSessions = () => {
     console.log("See all sessions pressed");
   };
@@ -180,21 +186,19 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {activeTab === "attendee" && (
-          <>
-            <UpcomingSessions
-              sessions={upcomingSessions}
-              onSessionPress={handleSessionPress}
-              onSeeAllPress={handleSeeAllSessions}
-            />
+        <>
+          <UpcomingSessions
+            sessions={upcomingSessions}
+            onSessionPress={handleSessionPress}
+            onSeeAllPress={handleSeeAllSessions}
+          />
 
-            <RecentActivity
-              activities={recentActivities}
-              onActivityPress={handleActivityPress}
-              onViewAllPress={handleViewAllActivities}
-            />
-          </>
-        )}
+          <RecentActivity
+            activities={recentActivities}
+            onActivityPress={handleActivityPress}
+            onViewAllPress={handleViewAllActivities}
+          />
+        </>
       </ScrollView>
 
       <CheckInModal
@@ -207,6 +211,12 @@ export default function HomeScreen() {
         visible={createSessionModalVisible}
         onClose={() => setCreateSessionModalVisible(false)}
         onCreate={handleCreateSession}
+      />
+
+      <ActivityModal
+        visible={activityModalVisible}
+        activity={selectedActivity}
+        onClose={() => setActivityModalVisible(false)}
       />
     </View>
   );

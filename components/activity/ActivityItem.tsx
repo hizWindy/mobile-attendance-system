@@ -93,7 +93,11 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
   const isAttendance = activity.type === "attendance";
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View
         style={[
           styles.iconContainer,
@@ -114,9 +118,8 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
         <Text style={styles.timestamp}>{activity.timestamp}</Text>
       </View>
 
-      <TouchableOpacity style={styles.viewButton} onPress={onPress}>
-        <Text style={styles.viewButtonText}>View</Text>
-      </TouchableOpacity>
+      {/* 👇 NOT clickable anymore */}
+      <Text style={styles.viewButtonText}>View</Text>
     </TouchableOpacity>
   );
 };

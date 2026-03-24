@@ -71,7 +71,11 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({
             <ActivityItem
               key={activity.id}
               activity={activity}
-              onPress={() => onActivityPress?.(activity)}
+              onPress={() => {
+                if (onActivityPress) {
+                  onActivityPress(activity);
+                }
+              }}
             />
           ))
         ) : (
