@@ -5,11 +5,13 @@ import { TouchableOpacity, View, Text, StyleSheet, useColorScheme } from "react-
 interface CheckInButtonProps {
   onPress: () => void;
   title?: string;
+  disabled?: boolean;
 }
 
 export const CheckInButton: React.FC<CheckInButtonProps> = ({
   onPress,
   title = "Check In",
+  disabled = false,
 }) => {
   const isDark = useColorScheme() === 'dark';
 
@@ -18,10 +20,15 @@ export const CheckInButton: React.FC<CheckInButtonProps> = ({
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.8}
-        style={[styles.button, isDark && styles.buttonDark]}
+        disabled={disabled}
+        style={[
+          styles.button, 
+          isDark && styles.buttonDark,
+          disabled && styles.buttonDisabled
+        ]}
       >
         <Ionicons name="checkmark-circle" size={24} color="white" />
-        <Text style={styles.text}>
+        <Text style={[styles.text]}>
           {title}
         </Text>
       </TouchableOpacity>
@@ -46,10 +53,16 @@ const styles = StyleSheet.create({
   buttonDark: {
     backgroundColor: '#334155', // slate-700
   },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   text: {
     color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 16,
     marginLeft: 8,
+  },
+  textDisabled: {
+    color: '#9ca3af',
   }
 });

@@ -66,16 +66,26 @@ export default function HomeScreen() {
   const [recentActivities, setRecentActivities] =
     useState<Activity[]>(SAMPLE_ACTIVITIES);
 
+  const [searchError, setSearchError] = useState("");
+
   const handleCheckIn = () => {
     const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length === 0) return;
+
     const exists = sessions.some(
       (session) => session.toLowerCase() === trimmedQuery.toLowerCase(),
     );
     if (!exists) {
-      Alert.alert("Error", "Session doesn't exist");
+      setSearchError("Session code not found. Please check and try again.");
     } else {
+      setSearchError("");
       setCheckInModalVisible(true);
     }
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchError) setSearchError(""); // Clear error while typing
   };
 
   const handleCreateSession = (sessionCode: string) => {
@@ -126,18 +136,23 @@ export default function HomeScreen() {
             <View className="mb-3 items-center w-full">
               <SearchSessions
                 value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Enter session code"
+                onChangeText={handleSearchChange}
+                placeholder="Enter 6-digit session code"
+                hasError={!!searchError}
+                errorMessage={searchError}
               />
             </View>
           )}
 
           <View className="items-center w-full">
             {activeTab === "attendee" ? (
-              <CheckInButton
-                title="Confirm Attendance"
-                onPress={handleCheckIn}
-              />
+              <View className="w-full">
+                <CheckInButton
+                  title="Check-In"
+                  onPress={handleCheckIn}
+                  disabled={searchQuery.length === 0}
+                />
+              </View>
             ) : (
               <SupervisorCreateSessionButton
                 title="Create Session"

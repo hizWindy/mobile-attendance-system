@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import { Text, TouchableOpacity, View, ScrollView, TouchableWithoutFeedback } from "react-native";
+import { Text, TouchableOpacity, View, ScrollView, TouchableWithoutFeedback, StyleSheet, useColorScheme } from "react-native";
 import { Activity } from "../activity/ActivityItem";
 
 interface ActivityModalProps {
@@ -14,6 +14,9 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   activity,
   onClose,
 }) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   if (!activity || !visible) return null;
 
   const getMeta = () => {
@@ -23,21 +26,21 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
           icon: <Ionicons name="checkmark-circle" size={30} color="#2563eb" />,
           label: "Attendance Action",
           description: "User checked into a session.",
-          bgClass: "bg-blue-100 dark:bg-blue-900/30",
+          bg: isDark ? "rgba(37, 99, 235, 0.2)" : "#eff6ff",
         };
       case "management":
         return {
           icon: <MaterialCommunityIcons name="shield-account" size={30} color="#7c3aed" />,
           label: "Management Action",
           description: "Administrative action performed.",
-          bgClass: "bg-purple-100 dark:bg-purple-900/40",
+          bg: isDark ? "rgba(124, 58, 237, 0.2)" : "#f5f3ff",
         };
       default:
         return {
           icon: <Ionicons name="information-circle" size={30} color="#64748b" />,
           label: "System Event",
           description: "Background system activity.",
-          bgClass: "bg-gray-100 dark:bg-slate-700",
+          bg: isDark ? "rgba(100, 116, 139, 0.2)" : "#f8fafc",
         };
     }
   };
@@ -45,57 +48,42 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const meta = getMeta();
 
   return (
-    <View 
-      className="absolute top-0 left-0 right-0 bottom-0 z-50 flex-1 justify-center items-center" 
-      style={{ backgroundColor: "rgba(0,0,0,0.5)", elevation: 100 }}
-    >
+    <View style={styles.overlay}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View className="absolute inset-0 w-full h-full" />
+        <View style={StyleSheet.absoluteFill} />
       </TouchableWithoutFeedback>
 
-      <View 
-        className="w-[90%] max-w-sm max-h-[85%] bg-white dark:bg-slate-800 rounded-3xl overflow-hidden"
-        style={{
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 15 },
-          shadowOpacity: 0.15,
-          shadowRadius: 20,
-          elevation: 15,
-        }}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 32 }}>
-          {/* Header */}
-          <View className="flex-row justify-end mb-2">
-            <TouchableOpacity onPress={onClose} className="p-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
-              <Ionicons name="close" size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
+      <View style={[styles.modalBox, isDark && styles.modalBoxDark]}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && styles.closeBtnDark]}>
+            <Ionicons name="close" size={20} color={isDark ? "#94a3b8" : "#64748b"} />
+          </TouchableOpacity>
           
-          <View className="items-center mb-5">
-            <View className={`w-16 h-16 rounded-2xl items-center justify-center mb-4 ${meta.bgClass}`}>
+          <View style={styles.centerItems}>
+            <View style={[styles.iconContainer, { backgroundColor: meta.bg }]}>
               {meta.icon}
             </View>
-            <Text className="text-xl font-extrabold text-[#0f172a] dark:text-white text-center">{activity.title}</Text>
-            <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">{meta.label}</Text>
+            <Text style={[styles.title, isDark && styles.textWhite]}>{activity.title}</Text>
+            <Text style={[styles.label, isDark && styles.textGrayDim]}>{meta.label}</Text>
           </View>
 
-          <Text className="text-center text-sm text-gray-500 dark:text-gray-300 mb-6 px-4 leading-5">{meta.description}</Text>
+          <Text style={[styles.description, isDark && styles.textGrayDim]}>{meta.description}</Text>
 
-          <View className="bg-gray-50 dark:bg-slate-700 rounded-2xl p-4 border border-gray-100 dark:border-slate-600">
-            <View className="flex-row items-center justify-between py-2 border-b border-gray-200 dark:border-slate-600">
-              <View className="flex-row items-center">
+          <View style={[styles.detailBox, isDark && styles.detailBoxDark]}>
+            <View style={[styles.detailRow, styles.borderBottom]}>
+              <View style={styles.rowLead}>
                 <Ionicons name="finger-print-outline" size={18} color="#9ca3af" />
-                <Text className="ml-2 text-sm text-gray-500 dark:text-gray-300">Type</Text>
+                <Text style={[styles.rowLabel, isDark && styles.textGrayDim]}>Type</Text>
               </View>
-              <Text className="text-sm font-bold text-[#0f172a] dark:text-blue-100 capitalize">{activity.type}</Text>
+              <Text style={[styles.rowValue, isDark && styles.textBlueLt]}>{activity.type}</Text>
             </View>
 
-            <View className="flex-row items-center justify-between py-2 mt-2">
-              <View className="flex-row items-center">
+            <View style={styles.detailRow}>
+              <View style={styles.rowLead}>
                 <Ionicons name="time-outline" size={18} color="#9ca3af" />
-                <Text className="ml-2 text-sm text-gray-500 dark:text-gray-300">Logged At</Text>
+                <Text style={[styles.rowLabel, isDark && styles.textGrayDim]}>Logged At</Text>
               </View>
-              <Text className="text-sm font-bold text-[#0f172a] dark:text-blue-100">{activity.timestamp}</Text>
+              <Text style={[styles.rowValue, isDark && styles.textBlueLt]}>{activity.timestamp}</Text>
             </View>
           </View>
         </ScrollView>
@@ -103,3 +91,113 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    zIndex: 1000,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "90%",
+    maxWidth: 400,
+    maxHeight: "85%",
+    backgroundColor: "white",
+    borderRadius: 32,
+    overflow: "hidden",
+    elevation: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+  },
+  modalBoxDark: {
+    backgroundColor: "#1e293b",
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 32,
+  },
+  closeBtn: {
+    alignSelf: "flex-end",
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    marginBottom: 8,
+  },
+  closeBtnDark: {
+    backgroundColor: "#334155",
+  },
+  centerItems: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    textAlign: "center",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#64748b",
+    marginTop: 4,
+  },
+  description: {
+    textAlign: "center",
+    fontSize: 14,
+    color: "#64748b",
+    marginBottom: 24,
+    paddingHorizontal: 16,
+    lineHeight: 20,
+  },
+  detailBox: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+  },
+  detailBoxDark: {
+    backgroundColor: "#0f172a",
+    borderColor: "#334155",
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  borderBottom: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  rowLead: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rowLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#64748b",
+  },
+  rowValue: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#0f172a",
+  },
+  textWhite: { color: "white" },
+  textGrayDim: { color: "#94a3b8" },
+  textBlueLt: { color: "#bfdbfe" },
+});
