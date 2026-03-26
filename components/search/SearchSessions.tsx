@@ -1,4 +1,3 @@
-// components/SearchSessions.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { TextInput, View } from "react-native";
@@ -7,45 +6,37 @@ interface SearchSessionsProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
-  width?: number;
-  height?: number;
 }
 
 export const SearchSessions: React.FC<SearchSessionsProps> = ({
   value,
   onChangeText,
   placeholder = "Search Sessions...",
-  width,
-  height,
 }) => {
   const [focused, setFocused] = useState(false);
 
   return (
     <View
-      className="flex-row items-center bg-white rounded-xl shadow-lg px-4  mx-4 my-2"
-      style={{
-        width,
-        height,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      }}
+      className={`flex-row items-center w-full h-12 px-4 rounded-xl border ${
+        focused
+          ? "bg-white dark:bg-slate-800 border-blue-500 dark:border-blue-400"
+          : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+      }`}
     >
       <MaterialCommunityIcons
         name="magnify"
         size={24}
-        color={focused ? "#001F54" : "#999999"}
-        className="mr-2"
+        color={focused ? "#3b82f6" : "#9ca3af"}
+        style={{ marginRight: 8 }}
       />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#999999"
+        placeholderTextColor="#9ca3af"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="flex-1 text-base text-[#001F54]"
+        className="flex-1 text-base text-[#001F54] dark:text-white"
       />
     </View>
   );

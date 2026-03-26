@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 
 interface SegmentedTabProps {
   options: { key: string; label: string }[];
@@ -7,72 +7,32 @@ interface SegmentedTabProps {
   onChange: (key: string) => void;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    maxWidth: 340,
-    flexDirection: "row",
-    backgroundColor: "#f2f7ffcc",
-    borderRadius: 999,
-    padding: 4,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#d8e1ef",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  tabButtonActive: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#cacedc",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabText: {
-    fontWeight: "700",
-  },
-  tabTextActive: {
-    color: "#1f4d7a",
-    fontWeight: "800",
-  },
-  tabTextInactive: {
-    color: "#769ed1",
-  },
-});
-
 export const SegmentedTab: React.FC<SegmentedTabProps> = ({
   options,
   activeKey,
   onChange,
 }) => {
   return (
-    <View style={styles.container}>
+    <View className="flex-row w-full bg-blue-50 dark:bg-slate-800 rounded-full p-1 border border-blue-100 dark:border-slate-700 mb-3">
       {options.map((option) => {
         const active = option.key === activeKey;
         return (
           <TouchableOpacity
             key={option.key}
-            style={[styles.tabButton, active && styles.tabButtonActive]}
+            className={`flex-1 items-center py-2.5 rounded-full ${
+              active
+                ? "bg-white dark:bg-slate-700 border border-blue-200 dark:border-slate-600"
+                : "bg-transparent border border-transparent"
+            }`}
             onPress={() => onChange(option.key)}
             activeOpacity={0.8}
           >
             <Text
-              style={[
-                styles.tabText,
-                active ? styles.tabTextActive : styles.tabTextInactive,
-              ]}
+              className={`font-semibold ${
+                active
+                  ? "text-[#1f4d7a] dark:text-blue-100 font-extrabold"
+                  : "text-blue-500 dark:text-slate-400"
+              }`}
             >
               {option.label}
             </Text>

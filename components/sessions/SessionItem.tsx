@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 
 export interface Session {
   id: string;
@@ -14,97 +14,38 @@ interface SessionItemProps {
   onPress?: () => void;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  dateBox: {
-    alignItems: "center",
-    marginRight: 12,
-    minWidth: 50,
-  },
-  dateMonth: {
-    fontSize: 11,
-    color: "#999",
-    fontWeight: "600",
-  },
-  dateDay: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1f4d7a",
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  sessionName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1f4d7a",
-    marginBottom: 2,
-  },
-  sessionTime: {
-    fontSize: 12,
-    color: "#999",
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statusBadgeConfirmed: {
-    backgroundColor: "#e8f5e9",
-  },
-  statusBadgePending: {
-    backgroundColor: "#fff3e0",
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  statusTextConfirmed: {
-    color: "#4caf50",
-  },
-  statusTextPending: {
-    color: "#ff9800",
-  },
-});
-
 export const SessionItem: React.FC<SessionItemProps> = ({
   session,
   onPress,
 }) => {
   const isConfirmed = session.status === "CONFIRMED";
+  const [month, day] = session.date.split(" ");
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
-      <View style={styles.dateBox}>
-        <Text style={styles.dateMonth}>{session.date.split(" ")[0]}</Text>
-        <Text style={styles.dateDay}>{session.date.split(" ")[1]}</Text>
+    <TouchableOpacity 
+      className="flex-row items-center py-3 border-b border-gray-100 dark:border-slate-800" 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View className="items-center mr-3 min-w-[50px]">
+        <Text className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold uppercase">{month}</Text>
+        <Text className="text-lg font-extrabold text-[#1f4d7a] dark:text-blue-100">{day}</Text>
       </View>
 
-      <View style={styles.contentContainer}>
-        <Text style={styles.sessionName}>{session.name}</Text>
-        <Text style={styles.sessionTime}>{session.time}</Text>
+      <View className="flex-1">
+        <Text className="text-sm font-bold text-[#1f4d7a] dark:text-blue-100 mb-0.5">{session.name}</Text>
+        <Text className="text-xs text-gray-500 dark:text-gray-400">{session.time}</Text>
       </View>
 
       <View
-        style={[
-          styles.statusBadge,
-          isConfirmed ? styles.statusBadgeConfirmed : styles.statusBadgePending,
-        ]}
+        className={`px-2.5 py-1 rounded-full items-center justify-center ${
+          isConfirmed ? "bg-emerald-50 dark:bg-emerald-950" : "bg-orange-50 dark:bg-orange-950"
+        }`}
       >
         <Text
-          style={[
-            styles.statusText,
-            isConfirmed ? styles.statusTextConfirmed : styles.statusTextPending,
-          ]}
+          className={`text-[11px] font-bold ${
+            isConfirmed ? "text-emerald-600 dark:text-emerald-400" : "text-orange-500 dark:text-orange-400"
+          }`}
         >
           {session.status}
         </Text>

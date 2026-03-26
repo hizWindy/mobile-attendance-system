@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
+import { useColorScheme } from "react-native";
 
 export interface Activity {
   id: string;
@@ -15,97 +16,45 @@ interface ActivityItemProps {
   onPress?: () => void;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  iconContainerAttendance: {
-    backgroundColor: "#e3f2fd",
-  },
-  iconContainerManagement: {
-    backgroundColor: "#f3e5f5",
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f4d7a",
-    marginBottom: 2,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: "#999",
-  },
-  viewButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  viewButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#007aff",
-  },
-});
-
 export const ActivityItem: React.FC<ActivityItemProps> = ({
   activity,
   onPress,
 }) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const getIconColor = (type: Activity["type"]) => {
     switch (type) {
       case "attendance":
-        return "#1976d2";
+        return isDark ? "#60a5fa" : "#1976d2"; // blue-400 : blue-600
       case "management":
-        return "#7b1fa2";
+        return isDark ? "#c084fc" : "#7b1fa2"; // purple-400 : purple-700
       default:
-        return "#666";
+        return isDark ? "#9ca3af" : "#666666"; // gray-400 : gray-500
     }
   };
 
-  const getIconName = (type: Activity["type"]) => {
+  const getBgClass = (type: Activity["type"]) => {
     switch (type) {
       case "attendance":
-        return "check-circle";
+        return "bg-blue-50 dark:bg-blue-950";
       case "management":
-        return "cog";
+        return "bg-purple-50 dark:bg-purple-950";
       default:
-        return "info";
+        return "bg-gray-100 dark:bg-slate-800";
     }
   };
 
   const iconColor = getIconColor(activity.type);
-  const isAttendance = activity.type === "attendance";
+  const bgClass = getBgClass(activity.type);
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      className="flex-row items-center py-3 border-b border-gray-100 dark:border-slate-800"
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View
-        style={[
-          styles.iconContainer,
-          isAttendance
-            ? styles.iconContainerAttendance
-            : styles.iconContainerManagement,
-        ]}
-      >
+      <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${bgClass}`}>
         {activity.type === "attendance" ? (
           <Ionicons name="checkmark-circle" size={20} color={iconColor} />
         ) : (
@@ -113,13 +62,13 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
         )}
       </View>
 
-      <View style={styles.contentContainer}>
-        <Text style={styles.activityTitle}>{activity.title}</Text>
-        <Text style={styles.timestamp}>{activity.timestamp}</Text>
+      <View className="flex-1">
+        <Text className="text-sm font-semibold text-[#1f4d7a] dark:text-blue-100 mb-0.5">{activity.title}</Text>
+        <Text className="text-xs text-gray-500 dark:text-gray-400">{activity.timestamp}</Text>
       </View>
 
       {/* 👇 NOT clickable anymore */}
-      <Text style={styles.viewButtonText}>View</Text>
+      <Text className="text-xs font-semibold text-blue-500 dark:text-blue-400">View</Text>
     </TouchableOpacity>
   );
 };

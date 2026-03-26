@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 import { Session, SessionItem } from "./SessionItem";
 
 interface UpcomingSessionsProps {
@@ -9,62 +9,25 @@ interface UpcomingSessionsProps {
   onSeeAllPress?: () => void;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginTop: 20,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f4d7a",
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#007aff",
-  },
-  sessionsList: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-    marginHorizontal: 16,
-  },
-  emptyMessage: {
-    fontSize: 13,
-    color: "#999",
-    textAlign: "center",
-    paddingVertical: 16,
-  },
-});
-
 export const UpcomingSessions: React.FC<UpcomingSessionsProps> = ({
   sessions,
   onSessionPress,
   onSeeAllPress,
 }) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <ThemedText style={styles.title}>Upcoming Sessions</ThemedText>
+    <View className="mt-5 w-full">
+      <View className="flex-row justify-between items-center mb-3 px-1">
+        <ThemedText className="text-base font-bold text-[#1f4d7a] dark:text-blue-100">
+          Upcoming Sessions
+        </ThemedText>
         <TouchableOpacity onPress={onSeeAllPress}>
-          <ThemedText style={styles.seeAllText}>See all</ThemedText>
+          <ThemedText className="text-sm font-semibold text-blue-500">
+            See all
+          </ThemedText>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.sessionsList}>
+      <View className="bg-white dark:bg-slate-800 rounded-2xl px-4 py-2 mb-2">
         {sessions.length > 0 ? (
           sessions.map((session, index) => (
             <SessionItem
@@ -74,7 +37,7 @@ export const UpcomingSessions: React.FC<UpcomingSessionsProps> = ({
             />
           ))
         ) : (
-          <ThemedText style={styles.emptyMessage}>
+          <ThemedText className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
             No upcoming sessions
           </ThemedText>
         )}

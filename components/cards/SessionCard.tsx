@@ -1,9 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import { Text, TouchableOpacity, View, StyleSheet } from "react-native";
-
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+import { Text, TouchableOpacity, View, useColorScheme } from "react-native";
 
 export type SessionStatus = "upcoming" | "action-now" | "completed" | "missed";
 export type AttendanceStatus = "Present" | "Absent" | "Missed" | null;
@@ -29,17 +26,17 @@ interface SessionCardProps {
   onViewDetails?: () => void;
 }
 
-const STATUS_CONFIG: Record<SessionStatus, { label: string; labelColor: string; labelBg: string; borderColor: string }> = {
-  "upcoming": { label: "Upcoming", labelColor: "#1D4ED8", labelBg: "#EFF6FF", borderColor: "#BFDBFE" },
-  "action-now": { label: "Action Now", labelColor: "#B45309", labelBg: "#FFFBEB", borderColor: "#FDE68A" },
-  "completed": { label: "Completed", labelColor: "#065F46", labelBg: "#ECFDF5", borderColor: "#A7F3D0" },
-  "missed": { label: "Missed", labelColor: "#991B1B", labelBg: "#FEF2F2", borderColor: "#FECACA" },
+const STATUS_CONFIG: Record<SessionStatus, { label: string; textClass: string; bgClass: string; borderClass: string; iconColor: string; darkIconColor: string }> = {
+  "upcoming": { label: "Upcoming", textClass: "text-blue-700 dark:text-blue-300", bgClass: "bg-blue-50 dark:bg-blue-950", borderClass: "border-blue-200 dark:border-blue-800", iconColor: "#1D4ED8", darkIconColor: "#93C5FD" },
+  "action-now": { label: "Action Now", textClass: "text-amber-700 dark:text-amber-300", bgClass: "bg-amber-50 dark:bg-amber-950", borderClass: "border-amber-200 dark:border-amber-800", iconColor: "#B45309", darkIconColor: "#FCD34D" },
+  "completed": { label: "Completed", textClass: "text-emerald-700 dark:text-emerald-300", bgClass: "bg-emerald-50 dark:bg-emerald-950", borderClass: "border-emerald-200 dark:border-emerald-800", iconColor: "#065F46", darkIconColor: "#6EE7B7" },
+  "missed": { label: "Missed", textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950", borderClass: "border-red-200 dark:border-red-800", iconColor: "#991B1B", darkIconColor: "#FCA5A5" },
 };
 
-const ATTENDANCE_CONFIG: Record<string, { color: string; bg: string }> = {
-  Present: { color: "#065F46", bg: "#ECFDF5" },
-  Absent: { color: "#991B1B", bg: "#FEF2F2" },
-  Missed: { color: "#991B1B", bg: "#FEF2F2" },
+const ATTENDANCE_CONFIG: Record<string, { textClass: string; bgClass: string }> = {
+  Present: { textClass: "text-emerald-700 dark:text-emerald-300", bgClass: "bg-emerald-50 dark:bg-emerald-950" },
+  Absent: { textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950" },
+  Missed: { textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950" },
 };
 
 export const SessionCard: React.FC<SessionCardProps> = ({
@@ -52,111 +49,62 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   const attendanceConfig = session.attendance ? ATTENDANCE_CONFIG[session.attendance] : null;
 
   return (
-    <View style={[styles.card, { borderColor: config.borderColor }]}>
+    <View className={`bg-white dark:bg-slate-800 border rounded-2xl mb-3 overflow-hidden ${config.borderClass}`}>
       {/* Top Status */}
-      <View style={[styles.topBar, { backgroundColor: config.labelBg }]}>
-        <Text style={[styles.statusLabel, { color: config.labelColor }]}>{config.label}</Text>
-        <View style={styles.topRight}>
-          {session.role && <Text style={[styles.role, { color: config.labelColor }]}>{session.role}</Text>}
-          {session.idBadge && <Text style={[styles.idBadge, { color: config.labelColor }]}>{session.idBadge}</Text>}
-          {session.date && <Text style={[styles.dateText, { color: config.labelColor }]}>{session.date}</Text>}
+      <View className={`flex-row justify-between px-3 py-1.5 ${config.bgClass}`}>
+        <Text className={`text-xs font-bold uppercase ${config.textClass}`}>{config.label}</Text>
+        <View className="flex-row items-center gap-2">
+          {session.role && <Text className={`text-[10px] font-semibold ${config.textClass}`}>{session.role}</Text>}
+          {session.idBadge && <Text className={`text-[10px] opacity-80 ${config.textClass}`}>{session.idBadge}</Text>}
+          {session.date && <Text className={`text-[10px] opacity-80 ${config.textClass}`}>{session.date}</Text>}
         </View>
       </View>
 
       {/* Body */}
-      <View style={styles.body}>
-        <Text style={styles.title}>{session.title}</Text>
+      <View className="px-3 py-2.5">
+        <Text className="text-base font-bold mb-1 text-black dark:text-white">{session.title}</Text>
 
-        <View style={styles.instructorRow}>
+        <View className="flex-row items-center gap-1 mb-2">
           <Ionicons name="person-outline" size={12} color="#9CA3AF" />
-          <Text style={styles.instructorText}>{session.instructor} · {session.location}</Text>
+          <Text className="text-xs text-gray-500 dark:text-gray-400">{session.instructor} · {session.location}</Text>
         </View>
 
-        <View style={styles.bottomRow}>
-          <View style={styles.timeContainer}>
-            <Ionicons name="time-outline" size={13} color="#6B7280" />
-            <Text style={styles.timeText}>{session.timeStart} – {session.timeEnd}</Text>
+        <View className="flex-row items-center justify-between mt-1">
+          <View className="flex-row items-center gap-1 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-lg">
+            <Ionicons name="time-outline" size={13} color="#6B7280" className="dark:color-gray-400" />
+            <Text className="text-xs font-semibold text-gray-700 dark:text-gray-300">{session.timeStart} – {session.timeEnd}</Text>
           </View>
 
           {session.status === "upcoming" && onManageSession && (
-            <TouchableOpacity style={styles.manageBtn} onPress={onManageSession}>
-              <MaterialCommunityIcons name="cog-outline" size={14} color="#fff" />
-              <Text style={styles.btnText}>Manage Session</Text>
+            <TouchableOpacity className="flex-row items-center bg-gray-900 dark:bg-gray-100 px-2.5 py-1.5 rounded-xl gap-1" onPress={onManageSession}>
+              <MaterialCommunityIcons name="cog-outline" size={14} color="currentColor" className="text-white dark:text-black" />
+              <Text className="text-xs font-bold text-white dark:text-black">Manage Session</Text>
             </TouchableOpacity>
           )}
 
           {session.status === "action-now" && onCheckIn && (
-            <TouchableOpacity style={styles.checkInBtn} onPress={onCheckIn}>
+            <TouchableOpacity className="flex-row items-center bg-emerald-600 dark:bg-emerald-500 px-2.5 py-1.5 rounded-xl gap-1" onPress={onCheckIn}>
               <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
-              <Text style={styles.btnText}>Check In</Text>
+              <Text className="text-xs font-bold text-white">Check In</Text>
             </TouchableOpacity>
           )}
 
           {(session.status === "completed" || session.status === "missed") && onViewDetails && (
-            <TouchableOpacity onPress={onViewDetails}>
-              <Text style={styles.viewDetailsText}>View Details</Text>
+            <TouchableOpacity onPress={onViewDetails} className="py-1">
+              <Text className="text-xs font-bold text-blue-500 dark:text-blue-400">View Details</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {session.attendance && attendanceConfig && (
-          <View style={styles.attendanceContainer}>
-            <Text style={styles.attendanceLabel}>Attendance</Text>
-            <View style={[styles.attendanceBadge, { backgroundColor: attendanceConfig.bg }]}>
-              <Text style={[styles.attendanceText, { color: attendanceConfig.color }]}>{session.attendance}</Text>
+          <View className="mt-2.5 pt-2 border-t border-gray-200 dark:border-slate-700">
+            <Text className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5 uppercase">Attendance</Text>
+            <View className={`self-start px-2 py-0.5 rounded-full ${attendanceConfig.bgClass}`}>
+              <Text className={`text-[10px] font-bold ${attendanceConfig.textClass}`}>{session.attendance}</Text>
             </View>
           </View>
         )}
       </View>
     </View>
   );
-};
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  statusLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  topRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  role: { fontSize: 10, fontWeight: "600" },
-  idBadge: { fontSize: 10, opacity: 0.7 },
-  dateText: { fontSize: 10, opacity: 0.7 },
-  body: { paddingHorizontal: 12, paddingVertical: 10 },
-  title: { fontSize: 16, fontWeight: "bold", marginBottom: 4 },
-  instructorRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 8 },
-  instructorText: { fontSize: 12, color: "#6B7280" },
-  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  timeContainer: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F3F4F6", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
-  timeText: { fontSize: 12, fontWeight: "600", color: "#374151" },
-  manageBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#0A0F1E", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
-  checkInBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#059669", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
-  btnText: { fontSize: 12, fontWeight: "bold", color: "#fff" },
-  viewDetailsText: { fontSize: 12, fontWeight: "bold", color: "#3B82F6" },
-  attendanceContainer: { marginTop: 8, borderTopWidth: 1, borderTopColor: "#E5E7EB", paddingTop: 6 },
-  attendanceLabel: { fontSize: 10, fontWeight: "600", color: "#6B7280", marginBottom: 2, textTransform: "uppercase" },
-  attendanceBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
-  attendanceText: { fontSize: 10, fontWeight: "bold" },
-});
+};

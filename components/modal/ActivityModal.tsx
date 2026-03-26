@@ -1,13 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import {
-  Dimensions,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Text, TouchableOpacity, View, ScrollView, TouchableWithoutFeedback } from "react-native";
 import { Activity } from "../activity/ActivityItem";
 
 interface ActivityModalProps {
@@ -21,32 +14,30 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   activity,
   onClose,
 }) => {
-  if (!activity) return null;
-
-  const screenWidth = Dimensions.get("window").width;
+  if (!activity || !visible) return null;
 
   const getMeta = () => {
     switch (activity.type) {
       case "attendance":
         return {
-          icon: <Ionicons name="checkmark-circle" size={30} color="#1976d2" />,
-          label: "Attendance",
+          icon: <Ionicons name="checkmark-circle" size={30} color="#2563eb" />,
+          label: "Attendance Action",
           description: "User checked into a session.",
-          bg: "#e3f2fd",
+          bgClass: "bg-blue-100 dark:bg-blue-900/30",
         };
       case "management":
         return {
-          icon: <MaterialCommunityIcons name="cog" size={30} color="#7b1fa2" />,
-          label: "Management",
+          icon: <MaterialCommunityIcons name="shield-account" size={30} color="#7c3aed" />,
+          label: "Management Action",
           description: "Administrative action performed.",
-          bg: "#f3e5f5",
+          bgClass: "bg-purple-100 dark:bg-purple-900/40",
         };
       default:
         return {
-          icon: <Ionicons name="information-circle" size={30} color="#666" />,
-          label: "Other",
-          description: "General system activity.",
-          bg: "#eeeeee",
+          icon: <Ionicons name="information-circle" size={30} color="#64748b" />,
+          label: "System Event",
+          description: "Background system activity.",
+          bgClass: "bg-gray-100 dark:bg-slate-700",
         };
     }
   };
@@ -54,146 +45,61 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const meta = getMeta();
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.overlay}>
-        <View style={[styles.modalContainer, { width: screenWidth * 0.9 }]}>
-          {/* HEADER */}
-          <View style={styles.header}>
-            <View style={[styles.iconBadge, { backgroundColor: meta.bg }]}>
+    <View 
+      className="absolute top-0 left-0 right-0 bottom-0 z-50 flex-1 justify-center items-center" 
+      style={{ backgroundColor: "rgba(0,0,0,0.5)", elevation: 100 }}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View className="absolute inset-0 w-full h-full" />
+      </TouchableWithoutFeedback>
+
+      <View 
+        className="w-[90%] max-w-sm max-h-[85%] bg-white dark:bg-slate-800 rounded-3xl overflow-hidden"
+        style={{
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 15 },
+          shadowOpacity: 0.15,
+          shadowRadius: 20,
+          elevation: 15,
+        }}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 32 }}>
+          {/* Header */}
+          <View className="flex-row justify-end mb-2">
+            <TouchableOpacity onPress={onClose} className="p-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
+              <Ionicons name="close" size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          
+          <View className="items-center mb-5">
+            <View className={`w-16 h-16 rounded-2xl items-center justify-center mb-4 ${meta.bgClass}`}>
               {meta.icon}
             </View>
-
-            <Text style={styles.title}>{activity.title}</Text>
-            <Text style={styles.subtitle}>{meta.label}</Text>
+            <Text className="text-xl font-extrabold text-[#0f172a] dark:text-white text-center">{activity.title}</Text>
+            <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">{meta.label}</Text>
           </View>
 
-          {/* DESCRIPTION */}
-          <Text style={styles.description}>{meta.description}</Text>
+          <Text className="text-center text-sm text-gray-500 dark:text-gray-300 mb-6 px-4 leading-5">{meta.description}</Text>
 
-          {/* INFO CARD */}
-          <View style={styles.card}>
-            {/* TYPE */}
-            <View style={styles.row}>
-              <Ionicons name="pricetag-outline" size={18} color="#555" />
-              <Text style={styles.label}>Type</Text>
+          <View className="bg-gray-50 dark:bg-slate-700 rounded-2xl p-4 border border-gray-100 dark:border-slate-600">
+            <View className="flex-row items-center justify-between py-2 border-b border-gray-200 dark:border-slate-600">
+              <View className="flex-row items-center">
+                <Ionicons name="finger-print-outline" size={18} color="#9ca3af" />
+                <Text className="ml-2 text-sm text-gray-500 dark:text-gray-300">Type</Text>
+              </View>
+              <Text className="text-sm font-bold text-[#0f172a] dark:text-blue-100 capitalize">{activity.type}</Text>
             </View>
-            <Text style={styles.value}>{activity.type}</Text>
 
-            {/* TIME */}
-            <View style={styles.row}>
-              <Ionicons name="time-outline" size={18} color="#555" />
-              <Text style={styles.label}>Timestamp</Text>
+            <View className="flex-row items-center justify-between py-2 mt-2">
+              <View className="flex-row items-center">
+                <Ionicons name="time-outline" size={18} color="#9ca3af" />
+                <Text className="ml-2 text-sm text-gray-500 dark:text-gray-300">Logged At</Text>
+              </View>
+              <Text className="text-sm font-bold text-[#0f172a] dark:text-blue-100">{activity.timestamp}</Text>
             </View>
-            <Text style={styles.value}>{activity.timestamp}</Text>
           </View>
-
-          {/* CLOSE BUTTON */}
-          <TouchableOpacity
-            style={styles.closeButton}
-            activeOpacity={0.85}
-            onPress={onClose}
-          >
-            <Ionicons name="close-circle" size={18} color="#fff" />
-            <Text style={styles.closeText}> Close</Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
-    </Modal>
+    </View>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 10,
-  },
-
-  header: {
-    alignItems: "center",
-    marginBottom: 12,
-  },
-
-  iconBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1f4d7a",
-    textAlign: "center",
-  },
-
-  subtitle: {
-    fontSize: 13,
-    color: "#888",
-    marginTop: 2,
-  },
-
-  description: {
-    textAlign: "center",
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 14,
-  },
-
-  card: {
-    backgroundColor: "#f9fafc",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-  },
-
-  label: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: "#666",
-  },
-
-  value: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1f4d7a",
-    marginTop: 2,
-  },
-
-  closeButton: {
-    flexDirection: "row",
-    backgroundColor: "#001F54",
-    paddingVertical: 14,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  closeText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-});

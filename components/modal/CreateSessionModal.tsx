@@ -1,13 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
-import {
-  Dimensions,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Platform, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 
 interface CreateSessionModalProps {
   visible: boolean;
@@ -23,10 +17,29 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
   const [sessionName, setSessionName] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [sessionType, setSessionType] = useState<"On-site" | "Remote">(
-    "On-site",
-  );
+  const [sessionType, setSessionType] = useState<"On-site" | "Remote">("On-site");
   const [location, setLocation] = useState("");
+  const [radius, setRadius] = useState("");
+
+  const [dateObj, setDateObj] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDateObj(selectedDate);
+      setDate(selectedDate.toLocaleDateString());
+    }
+  };
+
+  const onTimeChange = (event: any, selectedDate?: Date) => {
+    setShowTimePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDateObj(selectedDate);
+      setTime(selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
 
   const handleGenerate = () => {
     const code = Math.random().toString(36).substr(2, 6).toUpperCase();
@@ -35,64 +48,121 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     setDate("");
     setTime("");
     setLocation("");
+    setRadius("");
     setSessionType("On-site");
     onClose();
   };
 
-  const screenWidth = Dimensions.get("window").width;
+  if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="slide">
-      <View style={styles.overlay}>
-        <View style={[styles.container, { width: screenWidth * 0.9 }]}>
-          <Text style={styles.title}>Create Session</Text>
+    <View 
+      className="absolute top-0 left-0 right-0 bottom-0 z-50 flex-1 justify-center items-center" 
+      style={{ backgroundColor: "rgba(0,0,0,0.5)", elevation: 100 }}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View className="absolute inset-0 w-full h-full" />
+      </TouchableWithoutFeedback>
 
-          <Text style={styles.label}>Session Name</Text>
+      <View 
+        className="w-[90%] max-w-sm max-h-[85%] bg-white dark:bg-slate-800 rounded-2xl overflow-hidden flex-col"
+        style={{
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.1,
+          shadowRadius: 15,
+          elevation: 10,
+        }}
+      >
+        {/* Sticky Header */}
+        <View className="flex-row justify-between items-center px-5 py-4 border-b border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <Text className="text-xl font-bold text-black dark:text-white">Create Session</Text>
+          <TouchableOpacity onPress={onClose} className="p-1 rounded-full bg-gray-100 dark:bg-slate-700">
+            <Ionicons name="close" size={20} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+          <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Session Name</Text>
           <TextInput
-            style={styles.input}
+            className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl px-4 bg-gray-50 dark:bg-slate-700 text-black dark:text-white mb-4"
             placeholder="e.g. Advanced Mathematics Q1"
+            placeholderTextColor="#9ca3af"
             value={sessionName}
             onChangeText={setSessionName}
           />
 
-          <View style={styles.row}>
-            <View style={styles.halfInputContainer}>
-              <Text style={styles.label}>Date</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="mm/dd/yyyy"
-                value={date}
-                onChangeText={setDate}
-              />
+          <View className="flex-row justify-between mb-4 gap-3">
+            <View className="flex-1">
+              <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Date</Text>
+              <TouchableOpacity
+                className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl px-4 bg-gray-50 dark:bg-slate-700 justify-center"
+                activeOpacity={0.8}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text className={`text-base ${date ? "text-black dark:text-white" : "text-[#9ca3af]"}`}>
+                  {date || "mm/dd/yyyy"}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.halfInputContainer}>
-              <Text style={styles.label}>Time</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="--:-- --"
-                value={time}
-                onChangeText={setTime}
-              />
+            <View className="flex-1">
+              <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Time</Text>
+              <TouchableOpacity
+                className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl px-4 bg-gray-50 dark:bg-slate-700 justify-center"
+                activeOpacity={0.8}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text className={`text-base ${time ? "text-black dark:text-white" : "text-[#9ca3af]"}`}>
+                  {time || "--:-- --"}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={styles.label}>Session Type</Text>
-          <View style={styles.segmented}>
+          {showDatePicker && (
+            <DateTimePicker
+              value={dateObj}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={dateObj}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
+
+          <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Session Type</Text>
+          <View className="flex-row rounded-xl border border-gray-300 dark:border-slate-600 overflow-hidden mb-4 bg-gray-50 dark:bg-slate-700 p-1">
             {(["On-site", "Remote"] as const).map((type) => (
               <TouchableOpacity
                 key={type}
-                style={[
-                  styles.segmentButton,
-                  sessionType === type && styles.segmentButtonActive,
-                ]}
+                activeOpacity={0.8}
+                className={`flex-1 items-center justify-center py-2.5 rounded-lg ${
+                  sessionType === type ? "bg-white dark:bg-slate-600" : "bg-transparent"
+                }`}
+                style={
+                  sessionType === type
+                    ? {
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 2,
+                        elevation: 2,
+                      }
+                    : undefined
+                }
                 onPress={() => setSessionType(type)}
               >
                 <Text
-                  style={
-                    sessionType === type
-                      ? styles.segmentTextActive
-                      : styles.segmentText
-                  }
+                  className={`font-semibold ${
+                    sessionType === type ? "text-blue-600 dark:text-blue-300 font-bold" : "text-gray-500 dark:text-gray-400"
+                  }`}
                 >
                   {type}
                 </Text>
@@ -100,149 +170,65 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             ))}
           </View>
 
-          <Text style={styles.label}>Location</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Room Number or Building Name"
-            value={location}
-            onChangeText={setLocation}
-          />
+          <View className="flex-row gap-3 mb-4">
+            <View className="flex-[2]">
+              <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Location</Text>
+              <TextInput
+                className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl px-4 bg-gray-50 dark:bg-slate-700 text-black dark:text-white"
+                placeholder="Room / Building"
+                placeholderTextColor="#9ca3af"
+                value={location}
+                onChangeText={setLocation}
+              />
+            </View>
+            <View className="flex-[1]">
+              <Text className="mb-1 text-sm text-gray-600 dark:text-gray-300 font-semibold">Radius (m)</Text>
+              <TextInput
+                className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl px-4 bg-gray-50 dark:bg-slate-700 text-black dark:text-white"
+                placeholder="20"
+                placeholderTextColor="#9ca3af"
+                keyboardType="numeric"
+                value={radius}
+                onChangeText={setRadius}
+              />
+            </View>
+          </View>
 
-          <Text style={[styles.label, { marginTop: 14 }]}>
-            Attendance Method
-          </Text>
-          <View style={styles.methodList}>
-            {[
-              "Entry Code",
-              "QR Code Scan",
-              "Geolocation",
-              "RFID / NFC Card",
+            <Text className="mb-2 text-sm text-gray-600 dark:text-gray-300 font-semibold">Authentication Methods</Text>
+            <View className="flex-row flex-wrap gap-2 mb-2">
+              {[
+                "Manual Check-In",
+                "QR Based",
+                "Geolocation",
+                "Facial Recognition", 
+              
             ].map((method) => (
-              <View key={method} style={styles.methodRow}>
-                <Text>{method}</Text>
+              <View key={method} className="rounded-full px-3 py-1.5 bg-blue-50 dark:bg-slate-700 border border-blue-100 dark:border-slate-600">
+                <Text className="text-blue-700 dark:text-blue-200 text-xs font-semibold">{method}</Text>
               </View>
             ))}
           </View>
-
+        </ScrollView>
+        
+        {/* Sticky Footer */}
+        <View className="p-4 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800">
           <TouchableOpacity
-            style={styles.generateButton}
+            className="w-full bg-blue-600 dark:bg-blue-500 rounded-xl py-3.5 items-center"
+            style={{
+              shadowColor: "#2563eb",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
             onPress={handleGenerate}
+            activeOpacity={0.8}
           >
-            <Text style={styles.generateText}>Generate Session</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeText}>Cancel</Text>
+            <Text className="text-white font-bold text-base">Generate Session</Text>
           </TouchableOpacity>
         </View>
+
       </View>
-    </Modal>
+    </View>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  container: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  label: {
-    marginTop: 6,
-    marginBottom: 4,
-    color: "#555",
-    fontWeight: "600",
-  },
-  input: {
-    width: "100%",
-    height: 42,
-    borderWidth: 1,
-    borderColor: "#d7dae2",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    backgroundColor: "#fdfdff",
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  halfInputContainer: {
-    flex: 1,
-  },
-  segmented: {
-    flexDirection: "row",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#c8d4e8",
-    overflow: "hidden",
-    marginTop: 4,
-  },
-  segmentButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    backgroundColor: "#f7f9fe",
-  },
-  segmentButtonActive: {
-    backgroundColor: "#eaf1ff",
-  },
-  segmentText: {
-    fontWeight: "600",
-    color: "#1d4378",
-  },
-  segmentTextActive: {
-    color: "#1f4d7a",
-    fontWeight: "700",
-  },
-  methodList: {
-    marginTop: 6,
-    backgroundColor: "#f8faff",
-    borderRadius: 10,
-    padding: 8,
-  },
-  methodRow: {
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#fff",
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "#dfe6f2",
-  },
-  generateButton: {
-    marginTop: 12,
-    backgroundColor: "#2c7eff",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  generateText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  closeButton: {
-    marginTop: 8,
-    alignItems: "center",
-  },
-  closeText: {
-    color: "#1f4d7a",
-    fontWeight: "700",
-  },
-});

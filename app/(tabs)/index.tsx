@@ -11,42 +11,7 @@ import { UpcomingSessions } from "@/components/sessions/UpcomingSessions";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { ThemedText } from "@/components/themed-text";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#e8eff8",
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 340,
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#1f4d7a",
-    marginBottom: 12,
-  },
-  searchContainer: {
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  buttonContainer: {
-    alignItems: "center",
-  },
-});
+import { ScrollView, View, Alert } from "react-native";
 
 // Sample data - Replace with actual data from API/state management
 const SAMPLE_SESSIONS: Session[] = [
@@ -107,7 +72,7 @@ export default function HomeScreen() {
       (session) => session.toLowerCase() === trimmedQuery.toLowerCase(),
     );
     if (!exists) {
-      alert("Session doesn't exist");
+      Alert.alert("Error", "Session doesn't exist");
     } else {
       setCheckInModalVisible(true);
     }
@@ -116,7 +81,7 @@ export default function HomeScreen() {
   const handleCreateSession = (sessionCode: string) => {
     setSessions((prev) => [...prev, sessionCode]);
     setSearchQuery(sessionCode);
-    alert(`Session created: ${sessionCode}`);
+    Alert.alert("Success", `Session created: ${sessionCode}`);
   };
 
   const handleSessionPress = (session: Session) => {
@@ -136,57 +101,53 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#e8eff8] dark:bg-slate-900">
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerClassName="p-4 items-center"
         showsVerticalScrollIndicator={false}
       >
-        <SegmentedTab
-          options={[
-            { key: "attendee", label: "Attendee" },
-            { key: "supervisor", label: "Supervisor" },
-          ]}
-          activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as "attendee" | "supervisor")}
-        />
+        <View className="w-full max-w-sm mb-6 mt-2">
+          <SegmentedTab
+            options={[
+              { key: "attendee", label: "Attendee" },
+              { key: "supervisor", label: "Supervisor" },
+            ]}
+            activeKey={activeTab}
+            onChange={(key) => setActiveTab(key as "attendee" | "supervisor")}
+          />
+        </View>
 
-        <View style={styles.card}>
-          <ThemedText style={styles.title}>
+        <View className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm elevation-3 mb-6">
+          <ThemedText className="text-xl font-extrabold text-[#1f4d7a] dark:text-blue-100 mb-3">
             {activeTab === "attendee" ? "Join a Session" : "Supervisor Panel"}
           </ThemedText>
 
           {activeTab === "attendee" && (
-            <View style={styles.searchContainer}>
+            <View className="mb-3 items-center w-full">
               <SearchSessions
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Enter session code"
-                width={260}
-                height={48}
               />
             </View>
           )}
 
-          <View style={styles.buttonContainer}>
+          <View className="items-center w-full">
             {activeTab === "attendee" ? (
               <CheckInButton
                 title="Confirm Attendance"
                 onPress={handleCheckIn}
-                width={260}
-                height={48}
               />
             ) : (
               <SupervisorCreateSessionButton
                 title="Create Session"
                 onPress={() => setCreateSessionModalVisible(true)}
-                width={260}
-                height={48}
               />
             )}
           </View>
         </View>
 
-        <>
+        <View className="w-full max-w-sm">
           <UpcomingSessions
             sessions={upcomingSessions}
             onSessionPress={handleSessionPress}
@@ -198,13 +159,13 @@ export default function HomeScreen() {
             onActivityPress={handleActivityPress}
             onViewAllPress={handleViewAllActivities}
           />
-        </>
+        </View>
       </ScrollView>
 
       <CheckInModal
         visible={checkInModalVisible}
         onClose={() => setCheckInModalVisible(false)}
-        onSelectType={(type) => alert(`You selected: ${type}`)}
+        onSelectType={(type) => Alert.alert("Success", `You selected: ${type}`)}
       />
 
       <CreateSessionModal
