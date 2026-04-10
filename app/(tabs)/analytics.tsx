@@ -3,8 +3,8 @@ import { DonutChart } from "@/components/charts/DonutChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { ScrollView, Text, useColorScheme, View } from "react-native";
+import React, { useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, Text, useColorScheme, View } from "react-native";
 
 // ─── Sample Data ────────────────────────────────────────────────────────────
 
@@ -58,7 +58,23 @@ const SESSIONS_PER_WEEK = [
   { label: "W5", value: 5 },
 ];
 
-const ATTENDANCE_RATE_TREND = [
+const ATTENDANCE_RATE_TREND_WEEK = [
+  { label: "Mon", value: 90 },
+  { label: "Tue", value: 88 },
+  { label: "Wed", value: 75 },
+  { label: "Thu", value: 92 },
+  { label: "Fri", value: 95 },
+  { label: "Sat", value: 80 },
+];
+
+const ATTENDANCE_RATE_TREND_MONTH = [
+  { label: "W1", value: 84 },
+  { label: "W2", value: 91 },
+  { label: "W3", value: 87 },
+  { label: "W4", value: 93 },
+];
+
+const ATTENDANCE_RATE_TREND_YEAR = [
   { label: "Jan", value: 84 },
   { label: "Feb", value: 88 },
   { label: "Mar", value: 91 },
@@ -67,7 +83,59 @@ const ATTENDANCE_RATE_TREND = [
   { label: "Jun", value: 91 },
 ];
 
-// ─── Sub-Components ──────────────────────────────────────────────────────────
+const ATTENDEE_MONTHLY_YEAR = [
+  { label: "Jan", value: 18 },
+  { label: "Feb", value: 20 },
+  { label: "Mar", value: 22 },
+  { label: "Apr", value: 19 },
+  { label: "May", value: 24 },
+  { label: "Jun", value: 21 },
+];
+
+const ATTENDEE_MONTHLY_MONTH = [
+  { label: "W1", value: 5 },
+  { label: "W2", value: 6 },
+  { label: "W3", value: 4 },
+  { label: "W4", value: 7 },
+];
+
+const ATTENDEE_MONTHLY_WEEK = [
+  { label: "Mon", value: 1 },
+  { label: "Tue", value: 1 },
+  { label: "Wed", value: 0 },
+  { label: "Thu", value: 1 },
+  { label: "Fri", value: 1 },
+  { label: "Sat", value: 1 },
+];
+
+const SESSIONS_WEEK = [
+  { label: "Mon", value: 2 },
+  { label: "Tue", value: 3 },
+  { label: "Wed", value: 1 },
+  { label: "Thu", value: 3 },
+  { label: "Fri", value: 2 },
+];
+
+const SESSIONS_MONTH = [
+  { label: "W1", value: 7 },
+  { label: "W2", value: 9 },
+  { label: "W3", value: 6 },
+  { label: "W4", value: 10 },
+];
+
+const SESSIONS_YEAR = [
+  { label: "Jan", value: 28 },
+  { label: "Feb", value: 32 },
+  { label: "Mar", value: 25 },
+  { label: "Apr", value: 35 },
+  { label: "May", value: 30 },
+  { label: "Jun", value: 38 },
+  { label: "Jul", value: 29 },
+];
+
+type Period = "Week" | "Month" | "Year";
+
+// ─── Sub-Component Types ─────────────────────────────────────────────────────
 
 type KpiCardProps = {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -78,35 +146,74 @@ type KpiCardProps = {
   isDark: boolean;
 };
 
-function KpiCard({ icon, label, value, unit = "", accent = "#001F54", isDark }: KpiCardProps) {
+// ─── Period Selector ──────────────────────────────────────────────────────────
+
+function PeriodSelector({ period, onChange, isDark }: { period: Period; onChange: (p: Period) => void; isDark: boolean }) {
   return (
-    <View
-      className={`flex-1 rounded-2xl p-4 mx-1 mb-3 ${isDark ? "bg-slate-800" : "bg-white"}`}
-      style={{
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.07,
-        shadowRadius: 8,
-        elevation: 4,
-      }}
-    >
-      <View
-        className="w-9 h-9 rounded-xl items-center justify-center mb-3"
-        style={{ backgroundColor: accent + "18" }}
-      >
-        <MaterialCommunityIcons name={icon} size={20} color={accent} />
-      </View>
-      <Text
-        className={`text-2xl font-black ${isDark ? "text-white" : "text-[#001F54]"}`}
-        style={{ letterSpacing: -0.5 }}
-      >
-        {value}
-        <Text className="text-sm font-medium text-slate-400">{unit}</Text>
-      </Text>
-      <Text className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-        {label}
-      </Text>
+    <View className={`flex-row rounded-xl p-1 mb-5 self-end ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+      {(["Week", "Month", "Year"] as Period[]).map((p) => (
+        <Pressable
+          key={p}
+          onPress={() => onChange(p)}
+          className={`px-3 py-1.5 rounded-lg ${period === p ? (isDark ? "bg-slate-600" : "bg-white") : ""}`}
+          style={period === p ? { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 } : {}}
+        >
+          <Text
+            className={`text-xs font-bold ${
+              period === p
+                ? isDark ? "text-blue-400" : "text-[#001F54]"
+                : isDark ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            {p}
+          </Text>
+        </Pressable>
+      ))}
     </View>
+  );
+}
+
+// ─── Animated KPI Card ────────────────────────────────────────────────────────
+
+function KpiCard({ icon, label, value, unit = "", accent = "#001F54", isDark }: KpiCardProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, tension: 300, friction: 10 }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }).start();
+
+  return (
+    <Pressable onPressIn={onPressIn} onPressOut={onPressOut} style={{ flex: 1, marginHorizontal: 4, marginBottom: 12 }}>
+      <Animated.View
+        style={[{
+          transform: [{ scale }],
+          backgroundColor: isDark ? "#1e293b" : "#ffffff",
+          borderRadius: 16,
+          padding: 16,
+          shadowColor: accent,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 4,
+        }]}
+      >
+        <View
+          className="w-9 h-9 rounded-xl items-center justify-center mb-3"
+          style={{ backgroundColor: accent + "1A" }}
+        >
+          <MaterialCommunityIcons name={icon} size={20} color={accent} />
+        </View>
+        <Text
+          className={`text-2xl font-black ${isDark ? "text-white" : "text-[#001F54]"}`}
+          style={{ letterSpacing: -0.5 }}
+        >
+          {value}
+          <Text className="text-sm font-medium text-slate-400">{unit}</Text>
+        </Text>
+        <Text className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -170,7 +277,13 @@ function InsightRow({ icon, text, positive = true, isDark }: InsightRowProps) {
 
 // ─── Attendee Analytics ───────────────────────────────────────────────────────
 
-function AttendeeAnalytics({ isDark }: { isDark: boolean }) {
+function AttendeeAnalytics({ isDark, period }: { isDark: boolean; period: Period }) {
+  const attendanceTrend =
+    period === "Week"
+      ? ATTENDEE_MONTHLY_WEEK
+      : period === "Month"
+      ? ATTENDEE_MONTHLY_MONTH
+      : ATTENDEE_MONTHLY_YEAR;
   const donutData = [
     { label: "Present", value: ATTENDEE_STATS.totalPresent, color: "#001F54" },
     { label: "Absent", value: ATTENDEE_STATS.totalAbsent, color: "#e2e8f0" },
@@ -244,18 +357,16 @@ function AttendeeAnalytics({ isDark }: { isDark: boolean }) {
         </View>
       </ChartCard>
 
-      {/* Monthly Attendance Line Chart */}
       <ChartCard
-        title="Monthly Attendance"
-        subtitle="Days attended per month"
+        title="Attendance Trend"
+        subtitle={`Days attended — ${period.toLowerCase()} view`}
         isDark={isDark}
       >
-        <LineChart data={ATTENDEE_MONTHLY} color="#001F54" height={140} />
+        <LineChart data={attendanceTrend} color="#001F54" height={140} />
       </ChartCard>
 
-      {/* Weekly Activity Bar Chart */}
       <ChartCard
-        title="This Week's Activity"
+        title="Activity by Day"
         subtitle="1 = Present, 0 = Absent"
         isDark={isDark}
       >
@@ -295,7 +406,20 @@ function AttendeeAnalytics({ isDark }: { isDark: boolean }) {
 
 // ─── Supervisor Analytics ─────────────────────────────────────────────────────
 
-function SupervisorAnalytics({ isDark }: { isDark: boolean }) {
+function SupervisorAnalytics({ isDark, period }: { isDark: boolean; period: Period }) {
+  const sessionsTrend =
+    period === "Week"
+      ? SESSIONS_WEEK
+      : period === "Month"
+      ? SESSIONS_MONTH
+      : SESSIONS_YEAR;
+
+  const rateTrend =
+    period === "Week"
+      ? ATTENDANCE_RATE_TREND_WEEK
+      : period === "Month"
+      ? ATTENDANCE_RATE_TREND_MONTH
+      : ATTENDANCE_RATE_TREND_YEAR;
   return (
     <>
       {/* KPI Row */}
@@ -333,22 +457,20 @@ function SupervisorAnalytics({ isDark }: { isDark: boolean }) {
         />
       </View>
 
-      {/* Sessions per Week */}
       <ChartCard
-        title="Sessions per Week"
-        subtitle="Frequency of hosted sessions"
+        title="Sessions Hosted"
+        subtitle={`Frequency — ${period.toLowerCase()} view`}
         isDark={isDark}
       >
-        <BarChart data={SESSIONS_PER_WEEK} color="#001F54" height={140} />
+        <BarChart data={sessionsTrend} color="#001F54" height={140} />
       </ChartCard>
 
-      {/* Attendance Rate Trend */}
       <ChartCard
         title="Attendance Rate Trend"
-        subtitle="Average monthly attendance rate (%)"
+        subtitle={`Average attendance rate — ${period.toLowerCase()} view`}
         isDark={isDark}
       >
-        <LineChart data={ATTENDANCE_RATE_TREND} color="#2563eb" height={140} />
+        <LineChart data={rateTrend} color="#2563eb" height={140} />
       </ChartCard>
 
       {/* Method Breakdown Donut */}
@@ -415,6 +537,7 @@ function SupervisorAnalytics({ isDark }: { isDark: boolean }) {
 
 const AnalyticsScreen = () => {
   const [activeTab, setActiveTab] = useState<"attendee" | "supervisor">("attendee");
+  const [period, setPeriod] = useState<Period>("Month");
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -446,10 +569,13 @@ const AnalyticsScreen = () => {
           </Text>
         </View>
 
+        {/* Period Selector */}
+        <PeriodSelector period={period} onChange={setPeriod} isDark={isDark} />
+
         {activeTab === "attendee" ? (
-          <AttendeeAnalytics isDark={isDark} />
+          <AttendeeAnalytics isDark={isDark} period={period} />
         ) : (
-          <SupervisorAnalytics isDark={isDark} />
+          <SupervisorAnalytics isDark={isDark} period={period} />
         )}
       </ScrollView>
     </View>
