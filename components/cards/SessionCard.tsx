@@ -1,110 +1,305 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
-import { Text, TouchableOpacity, View, useColorScheme } from "react-native";
+import React, { useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
-export type SessionStatus = "upcoming" | "action-now" | "completed" | "missed";
+import { SessionDetailsModal } from "@/components/modal/SessionDetailsModal";
+import { BackendSession, SessionStatus } from "@/types/SessionTypes";
+import { formatDuration, getSessionTimeStatus } from "@/utils/timeUtils";
+
+
 export type AttendanceStatus = "Present" | "Absent" | "Missed" | null;
 
-export interface Session {
-  id: string;
-  status: SessionStatus;
-  title: string;
-  instructor: string;
-  location: string;
-  timeStart: string;
-  timeEnd: string;
-  role?: string;
-  idBadge?: string;
-  date?: string;
-  attendance?: AttendanceStatus;
-}
-
 interface SessionCardProps {
-  session: Session;
+  session: BackendSession;
   onManageSession?: () => void;
   onCheckIn?: () => void;
   onViewDetails?: () => void;
 }
 
-const STATUS_CONFIG: Record<SessionStatus, { label: string; textClass: string; bgClass: string; borderClass: string; iconColor: string; darkIconColor: string }> = {
-  "upcoming": { label: "Upcoming", textClass: "text-blue-700 dark:text-blue-300", bgClass: "bg-blue-50 dark:bg-blue-950", borderClass: "border-blue-200 dark:border-blue-800", iconColor: "#1D4ED8", darkIconColor: "#93C5FD" },
-  "action-now": { label: "Action Now", textClass: "text-amber-700 dark:text-amber-300", bgClass: "bg-amber-50 dark:bg-amber-950", borderClass: "border-amber-200 dark:border-amber-800", iconColor: "#B45309", darkIconColor: "#FCD34D" },
-  "completed": { label: "Completed", textClass: "text-emerald-700 dark:text-emerald-300", bgClass: "bg-emerald-50 dark:bg-emerald-950", borderClass: "border-emerald-200 dark:border-emerald-800", iconColor: "#065F46", darkIconColor: "#6EE7B7" },
-  "missed": { label: "Missed", textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950", borderClass: "border-red-200 dark:border-red-800", iconColor: "#991B1B", darkIconColor: "#FCA5A5" },
+const STATUS_CONFIG: Record<
+  SessionStatus,
+  {
+    label: string;
+    textClass: string;
+    bgClass: string;
+    borderClass: string;
+    iconColor: string;
+    darkIconColor: string;
+  }
+> = {
+  active: {
+    label: "Active Now",
+    textClass: "text-[#0D9488] dark:text-teal-400",
+    bgClass: "bg-teal-50 dark:bg-teal-950/20",
+    borderClass: "border-[#0D9488]/20 dark:border-teal-800",
+    iconColor: "#0D9488",
+    darkIconColor: "#2DD4BF",
+  },
+  "action-now": {
+    label: "Active Now",
+    textClass: "text-[#0D9488] dark:text-teal-400",
+    bgClass: "bg-teal-50 dark:bg-teal-950/20",
+    borderClass: "border-[#0D9488]/20 dark:border-teal-800",
+    iconColor: "#0D9488",
+    darkIconColor: "#2DD4BF",
+  },
+  upcoming: {
+    label: "Upcoming",
+    textClass: "text-[#3B82F6] dark:text-blue-400",
+    bgClass: "bg-blue-50 dark:bg-blue-950/20",
+    borderClass: "border-[#3B82F6]/20 dark:border-blue-800",
+    iconColor: "#3B82F6",
+    darkIconColor: "#60A5FA",
+  },
+  past: {
+    label: "Past Session",
+    textClass: "text-[#64748B] dark:text-slate-400",
+    bgClass: "bg-slate-50 dark:bg-slate-900/20",
+    borderClass: "border-[#64748B]/20 dark:border-slate-800",
+    iconColor: "#64748B",
+    darkIconColor: "#94A3B8",
+  },
+  completed: {
+    label: "Past Session",
+    textClass: "text-[#64748B] dark:text-slate-400",
+    bgClass: "bg-slate-50 dark:bg-slate-900/20",
+    borderClass: "border-[#64748B]/20 dark:border-slate-800",
+    iconColor: "#64748B",
+    darkIconColor: "#94A3B8",
+  },
+  missed: {
+    label: "Missed",
+    textClass: "text-red-700 dark:text-red-300",
+    bgClass: "bg-red-50 dark:bg-red-950/20",
+    borderClass: "border-red-200 dark:border-red-800",
+    iconColor: "#EF4444",
+    darkIconColor: "#FCA5A5",
+  },
 };
 
-const ATTENDANCE_CONFIG: Record<string, { textClass: string; bgClass: string }> = {
-  Present: { textClass: "text-emerald-700 dark:text-emerald-300", bgClass: "bg-emerald-50 dark:bg-emerald-950" },
-  Absent: { textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950" },
-  Missed: { textClass: "text-red-700 dark:text-red-300", bgClass: "bg-red-50 dark:bg-red-950" },
+const ATTENDANCE_CONFIG: Record<
+  string,
+  { textClass: string; bgClass: string }
+> = {
+  Present: {
+    textClass: "text-[#0D9488] dark:text-teal-400",
+    bgClass: "bg-teal-50 dark:bg-teal-950/20",
+  },
+  Absent: {
+    textClass: "text-red-700 dark:text-red-300",
+    bgClass: "bg-red-50 dark:bg-red-950/20",
+  },
+  Missed: {
+    textClass: "text-red-700 dark:text-red-300",
+    bgClass: "bg-red-50 dark:bg-red-950/20",
+  },
 };
 
 export const SessionCard: React.FC<SessionCardProps> = ({
+
   session,
   onManageSession,
   onCheckIn,
   onViewDetails,
 }) => {
-  const config = STATUS_CONFIG[session.status];
-  const attendanceConfig = session.attendance ? ATTENDANCE_CONFIG[session.attendance] : null;
+  const [detailsVisible, setDetailsVisible] = useState(false);
+
+  const rawStatus = getSessionTimeStatus(session);
+  const isPast = rawStatus === "past";
+  
+  const config = (STATUS_CONFIG as any)[rawStatus] || STATUS_CONFIG["upcoming"];
+  
+  const instructorLabel =
+    session.details?.instructor ||
+    session.details?.speaker ||
+    "No Instructor";
+    
+  const locationLabel =
+    session.location?.name ||
+    session.location?.room ||
+    session.location?.address ||
+    session.location?.platform ||
+    "Location TBA";
+    
+  const durationLabel = session.required_time_rendered 
+    ? formatDuration(session.required_time_rendered) 
+    : "TBA";
+    
+  const formattedSetup = session.session_setup
+    ? session.session_setup.replace("_", " ").toUpperCase()
+    : "GENERAL";
 
   return (
-    <View className={`bg-white dark:bg-slate-800 border rounded-2xl mb-3 overflow-hidden ${config.borderClass}`}>
-      {/* Top Status */}
-      <View className={`flex-row justify-between px-3 py-1.5 ${config.bgClass}`}>
-        <Text className={`text-xs font-bold uppercase ${config.textClass}`}>{config.label}</Text>
-        <View className="flex-row items-center gap-2">
-          {session.role && <Text className={`text-[10px] font-semibold ${config.textClass}`}>{session.role}</Text>}
-          {session.idBadge && <Text className={`text-[10px] opacity-80 ${config.textClass}`}>{session.idBadge}</Text>}
-          {session.date && <Text className={`text-[10px] opacity-80 ${config.textClass}`}>{session.date}</Text>}
-        </View>
-      </View>
+    <>
+      <SessionDetailsModal
+        session={session}
+        visible={detailsVisible}
+        onClose={() => setDetailsVisible(false)}
+        onManageSession={onManageSession}
+        onCheckIn={onCheckIn}
+      />
 
-      {/* Body */}
-      <View className="px-3 py-2.5">
-        <Text className="text-base font-bold mb-1 text-black dark:text-white">{session.title}</Text>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => setDetailsVisible(true)}>
+        <View
+          className={`bg-white dark:bg-slate-800 border rounded-2xl mb-4 shadow-sm overflow-hidden ${config.borderClass}`}
+        >
+          {/* Status header */}
+          <View
+            className={`flex-row justify-between items-center px-4 py-2 ${config.bgClass}`}
+          >
+            <View className="flex-row items-center gap-2">
+              <Text
+                className={`text-[10px] font-extrabold uppercase tracking-widest ${config.textClass}`}
+              >
+                • {config.label}
+              </Text>
+              {session.session_code && (
+                <Text
+                  className={`text-[10px] uppercase font-bold opacity-75 ${config.textClass}`}
+                >
+                  [{session.session_code}]
+                </Text>
+              )}
+            </View>
 
-        <View className="flex-row items-center gap-1 mb-2">
-          <Ionicons name="person-outline" size={12} color="#9CA3AF" />
-          <Text className="text-xs text-gray-500 dark:text-gray-400">{session.instructor} · {session.location}</Text>
-        </View>
-
-        <View className="flex-row items-center justify-between mt-1">
-          <View className="flex-row items-center gap-1 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-lg">
-            <Ionicons name="time-outline" size={13} color="#6B7280" className="dark:color-gray-400" />
-            <Text className="text-xs font-semibold text-gray-700 dark:text-gray-300">{session.timeStart} – {session.timeEnd}</Text>
-          </View>
-
-          {session.status === "upcoming" && onManageSession && (
-            <TouchableOpacity className="flex-row items-center bg-gray-900 dark:bg-gray-100 px-2.5 py-1.5 rounded-xl gap-1" onPress={onManageSession}>
-              <MaterialCommunityIcons name="cog-outline" size={14} color="currentColor" className="text-white dark:text-black" />
-              <Text className="text-xs font-bold text-white dark:text-black">Manage Session</Text>
-            </TouchableOpacity>
-          )}
-
-          {session.status === "action-now" && onCheckIn && (
-            <TouchableOpacity className="flex-row items-center bg-emerald-600 dark:bg-emerald-500 px-2.5 py-1.5 rounded-xl gap-1" onPress={onCheckIn}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
-              <Text className="text-xs font-bold text-white">Check In</Text>
-            </TouchableOpacity>
-          )}
-
-          {(session.status === "completed" || session.status === "missed") && onViewDetails && (
-            <TouchableOpacity onPress={onViewDetails} className="py-1">
-              <Text className="text-xs font-bold text-blue-500 dark:text-blue-400">View Details</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {session.attendance && attendanceConfig && (
-          <View className="mt-2.5 pt-2 border-t border-gray-200 dark:border-slate-700">
-            <Text className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5 uppercase">Attendance</Text>
-            <View className={`self-start px-2 py-0.5 rounded-full ${attendanceConfig.bgClass}`}>
-              <Text className={`text-[10px] font-bold ${attendanceConfig.textClass}`}>{session.attendance}</Text>
+            <View className="flex-row items-center gap-1.5">
+              <View className="px-1.5 py-0.5 rounded-md bg-white/40 dark:bg-black/20">
+                <Text className={`text-[9px] font-bold ${config.textClass}`}>
+                  {formattedSetup}
+                </Text>
+              </View>
+              <View className="px-1.5 py-0.5 rounded-md bg-white/40 dark:bg-black/20">
+                <Text className={`text-[9px] font-bold ${config.textClass}`}>
+                   {session.role_type.toUpperCase()}
+                </Text>
+              </View>
             </View>
           </View>
-        )}
-      </View>
-    </View>
+
+          {/* Card body */}
+          <View className="p-4">
+            <Text className="text-lg font-extrabold mb-1 text-slate-900 dark:text-white leading-tight">
+              {session.session_name}
+            </Text>
+
+            {/* Date and Time Info */}
+            <Text className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-3 uppercase tracking-wider">
+               {session.schedule?.start_date} • {session.schedule?.start_time} - {session.schedule?.end_time}
+            </Text>
+
+            {session.details?.agenda && (
+              <Text
+                className="text-sm text-slate-500 dark:text-slate-400 mb-3"
+                numberOfLines={2}
+              >
+                {session.details.agenda}
+              </Text>
+            )}
+
+            {/* Info grid */}
+            <View className="flex-row flex-wrap gap-y-2 mb-4">
+              <View className="w-1/2 flex-row items-center gap-1.5 pr-2">
+                <Ionicons name="location-outline" size={14} color="#64748b" />
+                <Text
+                  className="text-xs text-slate-600 dark:text-slate-300 flex-1"
+                  numberOfLines={1}
+                >
+                  {locationLabel}
+                </Text>
+              </View>
+
+              <View className="w-1/2 flex-row items-center gap-1.5 pl-2">
+                <Ionicons name="time-outline" size={14} color="#64748b" />
+                <Text
+                  className="text-xs text-slate-600 dark:text-slate-300 flex-1"
+                  numberOfLines={1}
+                >
+                  {durationLabel}
+                </Text>
+              </View>
+
+              <View className="w-1/2 flex-row items-center gap-1.5 pr-2">
+                <Ionicons name="person-outline" size={14} color="#64748b" />
+                <Text
+                  className="text-xs text-slate-600 dark:text-slate-300 flex-1"
+                  numberOfLines={1}
+                >
+                  {instructorLabel}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action buttons based on Role */}
+            <View className="flex-row items-center pt-3 border-t border-slate-100 dark:border-slate-700/50 justify-between">
+              <View className="flex-row gap-2">
+                
+                {/* 👨‍🏫 SUPERVISOR Actions */}
+                {session.role_type === "Supervisors" && onManageSession && (
+                  <TouchableOpacity
+                    className="flex-row items-center bg-slate-900 dark:bg-slate-100 px-4 py-2 rounded-xl gap-1.5"
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      onManageSession();
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name="cog-outline"
+                      size={15}
+                      color="white"
+                    />
+                    <Text className="text-xs font-bold text-white dark:text-black">
+                      Manage
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 🧑‍🎓 ATTENDED / ATTENDEE Actions */}
+                {session.role_type === "Attendee" && (
+                    session.attended ? (
+                      <View className="bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2 rounded-xl flex-row items-center gap-1.5">
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text className="text-xs font-bold text-emerald-600">Attended</Text>
+                      </View>
+                    ) : (
+                      onCheckIn && !isPast && (
+                        <TouchableOpacity
+                           className="flex-row items-center bg-blue-600 px-4 py-2 rounded-xl gap-1.5"
+                           onPress={(e) => {
+                             e.stopPropagation?.();
+                             onCheckIn();
+                           }}
+                        >
+                           <Ionicons name="scan-outline" size={15} color="#fff" />
+                           <Text className="text-xs font-extrabold text-white uppercase tracking-wide">
+                             Check In
+                           </Text>
+                        </TouchableOpacity>
+                      )
+                    )
+                )}
+
+                {isPast && (
+                    <TouchableOpacity
+                      className="bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl"
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        setDetailsVisible(true);
+                      }}
+                    >
+                      <Text className="text-xs font-bold text-slate-500">View History</Text>
+                    </TouchableOpacity>
+                )}
+              </View>
+
+              {session.attended && (
+                <View className="bg-emerald-50 px-2 py-1 rounded-md">
+                   <Text className="text-[9px] font-black text-emerald-700 uppercase">Confirmed</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </>
   );
-};
+};

@@ -40,7 +40,11 @@ function TabIcon({ focused, color, name }: TabIconProps) {
       <Animated.View
         style={[
           styles.dot,
-          { backgroundColor: color, transform: [{ scale: dotScale }], opacity: dotOpacity },
+          {
+            backgroundColor: color,
+            transform: [{ scale: dotScale }],
+            opacity: dotOpacity,
+          },
         ]}
       />
     </Animated.View>
@@ -107,7 +111,11 @@ export default function TabLayout() {
           headerShown: true,
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon focused={focused} color={color} name={focused ? "home-account" : "home-variant-outline"} />
+            <TabIcon
+              focused={focused}
+              color={color}
+              name={focused ? "home-account" : "home-variant-outline"}
+            />
           ),
         }}
       />
@@ -124,7 +132,11 @@ export default function TabLayout() {
           headerShown: true,
           title: "Sessions",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon focused={focused} color={color} name={focused ? "calendar-check" : "calendar-check-outline"} />
+            <TabIcon
+              focused={focused}
+              color={color}
+              name={focused ? "calendar-check" : "calendar-check-outline"}
+            />
           ),
         }}
       />
@@ -136,7 +148,13 @@ export default function TabLayout() {
           headerShown: true,
           title: "Analytics",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon focused={focused} color={color} name={focused ? "chart-areaspline" : "chart-bell-curve-cumulative"} />
+            <TabIcon
+              focused={focused}
+              color={color}
+              name={
+                focused ? "chart-areaspline" : "chart-bell-curve-cumulative"
+              }
+            />
           ),
         }}
       />
@@ -146,7 +164,25 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon focused={focused} color={color} name={focused ? "account-circle" : "account-circle-outline"} />
+            <TabIcon
+              focused={focused}
+              color={color}
+              name={focused ? "account-circle" : "account-circle-outline"}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="debug"
+        options={{
+          title: "Debug",
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              focused={focused}
+              color={color}
+              name={focused ? "bug" : "bug-outline"}
+            />
           ),
         }}
       />

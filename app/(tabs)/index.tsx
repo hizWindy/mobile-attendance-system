@@ -10,8 +10,11 @@ import { Session } from "@/components/sessions/SessionItem";
 import { UpcomingSessions } from "@/components/sessions/UpcomingSessions";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { ThemedText } from "@/components/themed-text";
-import React, { useState } from "react";
-import { ScrollView, View, Alert } from "react-native";
+import { useSession } from "@/hooks/useSession";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import React, { useState, useRef, useEffect } from "react";
+import { ScrollView, View, Alert, Animated, Text } from "react-native";
 
 // Sample data - Replace with actual data from API/state management
 const SAMPLE_SESSIONS: Session[] = [
@@ -47,6 +50,8 @@ const SAMPLE_ACTIVITIES: Activity[] = [
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { addSession } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [checkInModalVisible, setCheckInModalVisible] = useState(false);
   const [createSessionModalVisible, setCreateSessionModalVisible] =
@@ -54,6 +59,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<"attendee" | "supervisor">(
     "attendee",
   );
+  const params = useLocalSearchParams();
 
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
     null,
@@ -67,6 +73,36 @@ export default function HomeScreen() {
     useState<Activity[]>(SAMPLE_ACTIVITIES);
 
   const [searchError, setSearchError] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastAnim = useRef(new Animated.Value(150)).current;
+
+  // Elegantly slide toast up from the bottom, hovering like a pill
+  useEffect(() => {
+    if (toastMessage) {
+      Animated.sequence([
+        Animated.spring(toastAnim, {
+          toValue: -80, // Slide up, resting above tab bar safely
+          tension: 65,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+        Animated.delay(3000),
+        Animated.timing(toastAnim, {
+          toValue: 150, // Sink back down
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setToastMessage(null);
+      });
+    }
+  }, [toastMessage]);
+
+  useEffect(() => {
+    if (params.loginSuccess === "true") {
+      setToastMessage("Successfully logged in!");
+    }
+  }, [params.loginSuccess]);
 
   const handleCheckIn = () => {
     const trimmedQuery = searchQuery.trim();
@@ -88,10 +124,25 @@ export default function HomeScreen() {
     if (searchError) setSearchError(""); // Clear error while typing
   };
 
-  const handleCreateSession = (sessionCode: string) => {
-    setSessions((prev) => [...prev, sessionCode]);
-    setSearchQuery(sessionCode);
-    Alert.alert("Success", `Session created: ${sessionCode}`);
+  const handleCreateSession = async (sessionCode: string, payload?: any) => {
+    if (payload) {
+      // Provide a default user_role_id if missing. The BackendSession type requires it.
+      payload.user_role_id = payload.user_role_id || 1;
+      
+      const newSession = await addSession(payload);
+      if (newSession) {
+        setSessions((prev) => [...prev, newSession.session_code]);
+        setSearchQuery(newSession.session_code);
+        setToastMessage(`Session created! Code: ${newSession.session_code}`);
+      } else {
+        Alert.alert("Data Error", "Failed to create session on the backend. Please try again.");
+      }
+    } else {
+      // Fallback if no payload is provided
+      setSessions((prev) => [...prev, sessionCode]);
+      setSearchQuery(sessionCode);
+      setToastMessage(`Mock session created: ${sessionCode}`);
+    }
   };
 
   const handleSessionPress = (session: Session) => {
@@ -112,6 +163,25 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-[#e8eff8] dark:bg-slate-900">
+      {/* ── Custom Animated Bottom Pill Toast ── */}
+      <Animated.View
+        className="absolute bottom-0 self-center flex-row items-center bg-white dark:bg-slate-800 px-5 py-3 rounded-full"
+        style={{
+          transform: [{ translateY: toastAnim }],
+          zIndex: 9999,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          elevation: 10,
+        }}
+      >
+        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+        <Text className="text-slate-800 dark:text-white font-bold ml-2 text-sm">
+          {toastMessage}
+        </Text>
+      </Animated.View>
+
       <ScrollView
         contentContainerClassName="p-4 items-center"
         showsVerticalScrollIndicator={false}
