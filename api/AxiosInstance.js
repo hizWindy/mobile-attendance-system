@@ -2,11 +2,12 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 const api = axios.create({
   baseURL: "https://weblike-emory-etymologic.ngrok-free.dev/api/v1",
-  timeout: 10000,
   headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
+  "Content-Type": "application/json",
+  Accept: "application/json",
+  "ngrok-skip-browser-warning": "true",
+},
+timeout: 30000,
 });
 
 

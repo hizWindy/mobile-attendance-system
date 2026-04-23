@@ -1,10 +1,14 @@
-import { useContext } from 'react';
-import { SessionContext, SessionContextType } from '../context/SessionContext';
+// /hooks/useSession.ts
+import { useContext } from "react";
+import {
+  MySessionsContext,
+  MySessionsContextType,
+} from "../context/MySessionsContext";
 
-export const useSession = (): SessionContextType => {
-  const context = useContext(SessionContext);
+export const useSession = (): MySessionsContextType => {
+  const context = useContext(MySessionsContext);
   if (!context) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error("useSession must be used within a MySessionsProvider");
   }
   return context;
 };

@@ -20,25 +20,37 @@ export const SearchSessions: React.FC<SearchSessionsProps> = ({
 }) => {
   const [focused, setFocused] = useState(false);
 
+  const [showLimitWarning, setShowLimitWarning] = useState(false);
+
   const handleTextChange = (text: string) => {
-    if (text.length <= 6) {
-      onChangeText(text);
+    // Allow alphanumeric input and auto-capitalize
+    const alphanumericValue = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    
+    if (alphanumericValue.length > 6) {
+      // Trigger warning tooltip if attempting to exceed 6 characters
+      setShowLimitWarning(true);
+      setTimeout(() => setShowLimitWarning(false), 2500);
+    }
+    
+    // Trim and sync
+    if (alphanumericValue.length <= 6) {
+      onChangeText(alphanumericValue);
     }
   };
 
   return (
     <View className="w-full relative">
-      {/* Vibrantly Pill (Noticeable & Branded) */}
-      {value.length === 6 && focused && !hasError && (
+      {/* Warning Tooltip (Only visible when user tries to exceed 6 digits) */}
+      {showLimitWarning && focused && (
         <View className="absolute -bottom-11 left-0 right-0 items-center z-50">
           <View 
-            className="w-2.5 h-2.5 bg-indigo-600 -mb-1" 
+            className="w-2.5 h-2.5 bg-red-500 -mb-1 border-t border-l border-white/20" 
             style={{ transform: [{ rotate: "45deg" }] }}
           />
-          <View className="flex-row items-center bg-indigo-600 px-3 py-1.5 rounded-xl shadow-lg border border-white/20">
-            <MaterialCommunityIcons name="information-variant" size={12} color="white" />
+          <View className="flex-row items-center bg-red-500 px-3 py-1.5 rounded-xl shadow-lg border border-white/20">
+            <MaterialCommunityIcons name="alert-circle" size={12} color="white" />
             <ThemedText className="text-white text-[10px] font-medium ml-1">
-              Maximum 6 digits
+              Session code must be exactly 6 characters
             </ThemedText>
           </View>
         </View>

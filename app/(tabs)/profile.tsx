@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useContext, useMemo } from "react";
 import {
   Alert,
   ScrollView,
@@ -22,16 +22,42 @@ const COLORS = {
 };
 
 import { AuthContext } from "@/context/AuthContext";
+import { MyAttendanceContext } from "@/context/MyAttendanceContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user: authUser, logout } = React.useContext(AuthContext);
+  const { user: authUser, logout } = useContext(AuthContext);
+  const attendanceCtx = useContext(MyAttendanceContext);
   
   const user = {
     name: authUser?.full_name || "Guest User",
     email: authUser?.email || "No Email",
     initials: authUser?.full_name?.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "GU",
   };
+
+  // ── Compute real metrics from attendance records ──────────────────────────
+  const metrics = useMemo(() => {
+    const records = attendanceCtx?.attendances ?? [];
+    const total = records.length;
+    if (total === 0) return { sessions: 0, rate: "—", onTime: "—" };
+
+    const attended = records.filter((r) =>
+      ["present", "on-time", "late", "completed", "incomplete"].includes(r.status)
+    ).length;
+
+    const onTimeCount = records.filter((r) =>
+      r.arrival_status === "on_time" || r.status === "on-time"
+    ).length;
+
+    const rate = Math.round((attended / total) * 100);
+    const onTimeRate = attended > 0 ? Math.round((onTimeCount / attended) * 100) : 0;
+
+    return {
+      sessions: total,
+      rate: `${rate}%`,
+      onTime: `${onTimeRate}%`,
+    };
+  }, [attendanceCtx?.attendances]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -110,11 +136,11 @@ export default function ProfileScreen() {
 
         {/* 📊 Simple Metrics Bar */}
         <View style={styles.metricsBar}>
-           <ProfileMetric label="Attended" value="98%" />
+           <ProfileMetric label="Attend Rate" value={metrics.rate} />
            <View style={styles.hDivider} />
-           <ProfileMetric label="Sessions" value="145" />
+           <ProfileMetric label="Sessions" value={String(metrics.sessions)} />
            <View style={styles.hDivider} />
-           <ProfileMetric label="Points" value="2k" />
+           <ProfileMetric label="On-Time" value={metrics.onTime} />
         </View>
 
         {/* ⚙ Settings List */}

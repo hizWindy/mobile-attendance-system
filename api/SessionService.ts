@@ -1,6 +1,7 @@
 import { BackendSession } from "../types/SessionTypes";
 import api from "./AxiosInstance"; // make sure AxiosInstance handles absolute imports properly or has a .ts/.js
 
+
 const SessionService = {
   
   // for admin used
@@ -42,6 +43,11 @@ const SessionService = {
     const response = await api.delete(`/sessions/delete/${sessionId}`);
     return response.data;
   },
+
+  getSessionReport : async ( sessionId : number | string ) : Promise<any> => {
+    const response = await api.get(`/sessions/report/${sessionId}`);
+    return response.data;
+  }
 };
 
 export default SessionService;

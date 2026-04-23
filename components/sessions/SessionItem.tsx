@@ -6,7 +6,7 @@ export interface Session {
   date: string;
   name: string;
   time: string;
-  status: "CONFIRMED" | "PENDING";
+  status: "MANAGING" | "ATTENDING";
 }
 
 interface SessionItemProps {
@@ -18,7 +18,7 @@ export const SessionItem: React.FC<SessionItemProps> = ({
   session,
   onPress,
 }) => {
-  const isConfirmed = session.status === "CONFIRMED";
+  const isConfirmed = session.status === "MANAGING";
   const [month, day] = session.date.split(" ");
 
   return (

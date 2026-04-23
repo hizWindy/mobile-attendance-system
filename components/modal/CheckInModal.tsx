@@ -1,33 +1,88 @@
+import { SessionJoinData } from "@/api/AttendanceService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
-import { Text, TouchableOpacity, View, useColorScheme, StyleSheet, ScrollView, TouchableWithoutFeedback } from "react-native";
+import React, { useContext } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View, useColorScheme, ActivityIndicator } from "react-native";
+import { LocationContext } from "@/context/LocationContext";
+import { QRScannerModal, QRScanResult } from "@/components/modal/QRScannerModal";
 
 interface CheckInModalProps {
   visible: boolean;
+  session: SessionJoinData | null;
+  /** Identifies if the user is entering check-in or check-out flow */
+  actionType?: "check-in" | "check-out";
   onClose: () => void;
-  onSelectType: (type: string) => void;
+  onSelectType: (type: string, actionType: "check-in" | "check-out") => void;
+  /** Called when QR scanner completes with qr data + GPS coords */
+  onQRScan?: (result: QRScanResult, actionType: "check-in" | "check-out") => void;
 }
 
-const METHODS = [
-  { name: "Biometric", icon: "fingerprint", type: "MaterialCommunityIcons" },
-  { name: "Fingerprint", icon: "fingerprint", type: "MaterialCommunityIcons" },
-  { name: "Facial Recognition", icon: "face-recognition", type: "MaterialCommunityIcons" },
-  { name: "QR Scan", icon: "qr-code-outline", type: "Ionicons" },
-  { name: "RFID", icon: "radio", type: "Ionicons" },
-  { name: "Geo Location", icon: "location-outline", type: "Ionicons" },
-  { name: "Geo Fencing", icon: "map-outline", type: "Ionicons" },
-];
+// Maps backend method keys to human-readable display names and icons.
+// ✅ Do NOT rename backend keys — all transformations happen here.
+// Names are now functions that accept the actionType to produce dynamic labels.
+const METHODS: Record<string, { 
+  name: (action: "check-in" | "check-out") => string; 
+  icon: string; 
+  type: "Ionicons" | "MaterialCommunityIcons" 
+}> = {
+  manual:           { name: (a) => a === "check-in" ? "Manual Check-in"    : "Manual Check-out",    icon: "pencil-outline",            type: "MaterialCommunityIcons" },
+  "manual click":   { name: (a) => a === "check-in" ? "Manual Check-in"    : "Manual Check-out",    icon: "pencil-outline",            type: "MaterialCommunityIcons" }, // Legacy alias
+  qr:               { name: (a) => a === "check-in" ? "QR Check-in"        : "QR Check-out",        icon: "qr-code-outline",           type: "Ionicons" },
+  "qr based":       { name: (a) => a === "check-in" ? "QR Check-in"        : "QR Check-out",        icon: "qr-code-outline",           type: "Ionicons" }, // Legacy alias
+  geofencing:       { name: (a) => a === "check-in" ? "Location Check-in"  : "Location Check-out",  icon: "map-marker-radius-outline", type: "MaterialCommunityIcons" },
+  geolocation:      { name: (a) => a === "check-in" ? "Location Check-in"  : "Location Check-out",  icon: "map-marker-radius-outline", type: "MaterialCommunityIcons" }, // Alias
+  "location check": { name: (a) => a === "check-in" ? "Location Check-in"  : "Location Check-out",  icon: "map-marker-radius-outline", type: "MaterialCommunityIcons" }, // Legacy alias
+  rfid:             { name: (_) => "RFID Tap",                                                      icon: "nfc-tap",                   type: "MaterialCommunityIcons" },
+  nfc:              { name: (_) => "NFC Tap",                                                       icon: "nfc-tap",                   type: "MaterialCommunityIcons" },
+  biometric:        { name: (_) => "Biometric",                                                     icon: "fingerprint",               type: "MaterialCommunityIcons" },
+  fingerprint:      { name: (_) => "Fingerprint",                                                   icon: "fingerprint",               type: "MaterialCommunityIcons" },
+  face:             { name: (_) => "Facial Recognition",                                            icon: "face-recognition",         type: "MaterialCommunityIcons" },
+  "facial recognition": { name: (_) => "Facial Recognition",                                       icon: "face-recognition",         type: "MaterialCommunityIcons" }, // Legacy alias
+};
+
+const STATUS_CONFIG: Record<string, { label: string; accentColor: string; bgColor: string }> = {
+  active: { label: "Active Now", accentColor: "#0D9488", bgColor: "#F0FDFA" },
+  upcoming: { label: "Starts Soon", accentColor: "#3B82F6", bgColor: "#EFF6FF" },
+  past: { label: "Ended", accentColor: "#64748B", bgColor: "#F8FAFC" },
+};
 
 export const CheckInModal: React.FC<CheckInModalProps> = ({
   visible,
+  session,
+  actionType = "check-in",
   onClose,
   onSelectType,
+  onQRScan,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const iconColor = isDark ? "#93C5FD" : "#001F54";
+  const iconColor = isDark ? "#93C5FD" : "#0D9488";
+  const [qrScannerVisible, setQrScannerVisible] = React.useState(false);
 
-  if (!visible) return null;
+  const { location, address, loading: locationLoading, errorMsg: locationError, refreshLocation } = useContext(LocationContext);
+  const [selectedMethod, setSelectedMethod] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setSelectedMethod(null);
+    }
+  }, [visible]);
+
+  if (!visible || !session) return null;
+
+  // Data comes directly from the /join API response — no client-side computation needed
+  const isActive = session.is_active;
+  const cfg = STATUS_CONFIG[session.status] || STATUS_CONFIG["upcoming"];
+
+  // Build display list while preserving the backend key used for the API call.
+  // The map key IS the backend value ("manual", "qr", "geofencing") — never the UI label.
+  const allowedMethods = session.allowed_methods
+    .map((m) => {
+      const key = m.toLowerCase();
+      const display = METHODS[key];
+      // Resolve name dynamically based on current actionType
+      return display ? { key, name: display.name(actionType), icon: display.icon, type: display.type } : null;
+    })
+    .filter(Boolean) as Array<{ key: string; name: string; icon: string; type: "Ionicons" | "MaterialCommunityIcons" }>;
 
   return (
     <View style={styles.overlay}>
@@ -38,38 +93,149 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       <View style={[styles.modalContent, isDark && styles.modalContentDark]}>
         {/* Sticky Header with Close */}
         <View style={[styles.stickyHeader, isDark && styles.stickyHeaderDark]}>
-          <Text style={[styles.title, isDark && styles.titleDark]}>Check In Method</Text>
+          <Text style={[styles.title, isDark && styles.titleDark]}>Session Preview</Text>
           <TouchableOpacity onPress={onClose} style={[styles.closeIconWrapper, isDark && styles.closeIconWrapperDark]}>
             <Ionicons name="close" size={20} color={isDark ? "#94a3b8" : "#64748b"} />
           </TouchableOpacity>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>Select how you want to mark your attendance</Text>
           
-          <View style={styles.methodsContainer}>
-            {METHODS.map((method) => (
-              <TouchableOpacity
-                key={method.name}
-                style={[styles.methodButton, isDark && styles.methodButtonDark]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  onSelectType(method.name);
-                  onClose();
-                }}
-              >
-                {method.type === "Ionicons" ? (
-                  <Ionicons name={method.icon as any} size={22} color={iconColor} />
-                ) : (
-                  <MaterialCommunityIcons name={method.icon as any} size={22} color={iconColor} />
-                )}
-                <Text style={[styles.methodText, isDark && styles.methodTextDark]}>{method.name}</Text>
-                <Ionicons name="chevron-forward" size={18} color={isDark ? "#475569" : "#cbd5e1"} style={{ marginLeft: "auto" }} />
-              </TouchableOpacity>
-            ))}
+          {/* ── Preview Card ── */}
+          <View style={[styles.previewCard, isDark && styles.previewCardDark]}>
+            {/* Status Pill */}
+            <View style={{ flexDirection: "row", marginBottom: 12 }}>
+              <View style={[styles.statusPill, { backgroundColor: cfg.bgColor }]}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: cfg.accentColor, textTransform: "uppercase" }}>
+                  {cfg.label}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.sessionTitle, isDark && styles.sessionTitleDark]}>{session.session_name}</Text>
+            
+            <View style={styles.previewInfoRow}>
+              <Ionicons name="location-outline" size={16} color={isDark ? "#94A3B8" : "#64748B"} />
+              <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark]}>
+                {session.location}
+              </Text>
+            </View>
+
+            <View style={styles.previewInfoRow}>
+              <Ionicons
+                name={isActive ? "radio-button-on-outline" : "time-outline"}
+                size={16}
+                color={isActive ? "#0D9488" : (isDark ? "#94A3B8" : "#64748B")}
+              />
+              <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark, isActive && { color: "#0D9488", fontWeight: "700" }]}>
+                {isActive ? "Session is currently active" : "Session has not started yet"}
+              </Text>
+            </View>
           </View>
+
+
+          {/* ── Check-In Options (ONLY IF ACTIVE) ── */}
+          {isActive ? (
+            <>
+              <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
+                {actionType === "check-in" 
+                  ? "Select an allowed method to mark your attendance" 
+                  : "Select an allowed method to complete your check-out"}
+              </Text>
+              
+              <View style={styles.methodsContainer}>
+                {allowedMethods.length === 0 ? (
+                   <Text style={{ color: "#EF4444", fontWeight: "600", fontSize: 13, padding: 10 }}>
+                     No check-in methods allowed by supervisor.
+                   </Text>
+                ) : (
+                  allowedMethods.map((method) => {
+                    const isSelected = selectedMethod === method.key;
+                    const isQR = method.key === "qr" || method.key === "qr based";
+                    return (
+                      <TouchableOpacity
+                        key={method.key}
+                        style={[
+                          styles.methodButton,
+                          isDark && styles.methodButtonDark,
+                          isSelected && { borderColor: iconColor, backgroundColor: isDark ? "#1E293B" : "#F0FDFA" }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          if (isQR && onQRScan) {
+                            // QR method: skip confirm step, open scanner immediately
+                            setQrScannerVisible(true);
+                          } else {
+                            setSelectedMethod(isSelected ? null : method.key);
+                          }
+                        }}
+                      >
+                        {method.type === "Ionicons" ? (
+                          <Ionicons name={method.icon as any} size={22} color={iconColor} />
+                        ) : (
+                          <MaterialCommunityIcons name={method.icon as any} size={22} color={iconColor} />
+                        )}
+                        <Text style={[styles.methodText, isDark && styles.methodTextDark, isSelected && { color: iconColor }]}>{method.name}</Text>
+                        
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={20} color={iconColor} style={{ marginLeft: "auto" }} />
+                        ) : (
+                          <Ionicons name="chevron-forward" size={18} color={isDark ? "#475569" : "#cbd5e1"} style={{ marginLeft: "auto" }} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+
+              {/* Location handling is fully automatic and implicit (Backend Payload included automatically) */}
+
+              {/* ── Confirm Button ── */}
+              <View style={{ marginTop: 24 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.confirmButton, 
+                    { backgroundColor: iconColor },
+                    (!selectedMethod || !location) && { opacity: 0.5 }
+                  ]}
+                  activeOpacity={0.9}
+                  disabled={!selectedMethod || !location}
+                  onPress={() => {
+                    if (selectedMethod && location) {
+                      onSelectType(selectedMethod, actionType);
+                      onClose();
+                    }
+                  }}
+                >
+                  <Text style={styles.confirmButtonText}>
+                    Confirm {actionType === "check-in" ? "Check-in" : "Check-out"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={[styles.inactiveWarning, isDark && styles.inactiveWarningDark]}>
+               <Ionicons name="alert-circle-outline" size={24} color={cfg.accentColor} />
+               <Text style={[styles.inactiveWarningText, { color: cfg.accentColor }]}>
+                 Check-in is only available when the session is currently active.
+               </Text>
+            </View>
+          )}
+
         </ScrollView>
       </View>
+
+      {/* QR Scanner — full screen, launched directly when QR method is tapped */}
+      <QRScannerModal
+        visible={qrScannerVisible}
+        actionType={actionType}
+        sessionName={session?.session_name}
+        onScanned={(result) => {
+          setQrScannerVisible(false);
+          onQRScan?.(result, actionType);
+        }}
+        onClose={() => setQrScannerVisible(false)}
+      />
     </View>
   );
 };
@@ -125,24 +291,79 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
-  title: {
+  
+  // Preview Card
+  previewCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0"
+  },
+  previewCardDark: {
+    backgroundColor: "#0F172A",
+    borderColor: "#1E293B"
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  sessionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 10,
   },
-  titleDark: {
-    color: '#f8fafc',
+  sessionTitleDark: {
+    color: "#FFFFFF",
   },
+  previewInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  previewInfoText: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  previewInfoTextDark: {
+    color: "#94A3B8"
+  },
+
+  // Subtitle
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748b',
-    marginBottom: 16,
+    fontWeight: "600",
+    marginBottom: 12,
   },
   subtitleDark: {
     color: '#94a3b8',
   },
+
+  // Methods
   methodsContainer: {
-    gap: 8,
+    gap: 12,
+  },
+  confirmButton: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  confirmButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
   methodButton: {
     flexDirection: 'row',
@@ -160,11 +381,48 @@ const styles = StyleSheet.create({
   },
   methodText: {
     marginLeft: 12,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#1e293b',
   },
   methodTextDark: {
     color: '#e2e8f0',
-  }
+  },
+
+  // Warning
+  inactiveWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+  },
+  inactiveWarningDark: {
+    backgroundColor: "#1E293B",
+  },
+  inactiveWarningText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  locationHelperText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  locationHelperTextDark: {
+    color: "#64748B",
+  },
+  locationAddressText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginTop: 4,
+  },
+  locationAddressTextDark: {
+    color: "#F1F5F9",
+  },
 });

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { TouchableOpacity, View, Text } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 
 interface SupervisorCreateSessionButtonProps {
   onPress: () => void;

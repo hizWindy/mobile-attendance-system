@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect } from "react";
 import * as SecureStore from "expo-secure-store";
 import { AuthService } from "../api/AuthService";
-import { clearAuthHeader } from "../api/AxiosInstance";
+import UserService from "../api/UserService";
+import api, { clearAuthHeader } from "../api/AxiosInstance";
 
 
 import { Alert } from "react-native";
@@ -19,10 +20,9 @@ export const AuthProvider = ({ children }: any) => {
             try {
                 const storedToken = await SecureStore.getItemAsync("access_token");
                 if (storedToken) {
-                    setToken(storedToken);
-                    // This will fetch user data. 
-                    // If expired, AxiosInstance.js will handle refresh automatically.
+                    api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
                     await fetchUser(); 
+                    setToken(storedToken);
                 }
             } catch (err) {
                 console.error("Auth init error:", err);
@@ -39,9 +39,13 @@ export const AuthProvider = ({ children }: any) => {
 
         await SecureStore.setItemAsync("access_token", access_token);
         await SecureStore.setItemAsync("refresh_token", refresh_token);
-        setToken(access_token);
+        
+        // Inject synchronously to avoid async interceptor delay
+        api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
 
         await fetchUser();
+        // Set token state last, which unblocks the rest of the application
+        setToken(access_token);
     };
 
     const signup = async (signupData: any) => {
@@ -50,14 +54,16 @@ export const AuthProvider = ({ children }: any) => {
 
         await SecureStore.setItemAsync("access_token", access_token);
         await SecureStore.setItemAsync("refresh_token", refresh_token);
-        setToken(access_token);
+        
+        api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
 
         await fetchUser();
+        setToken(access_token);
     };
 
     const fetchUser = async () => {
         try {
-            const res = await AuthService.getProfile();
+            const res = await UserService.getProfile();
             setUser(res);
         } catch (error: any) {
             console.error("Profile fetch error:", error);

@@ -43,15 +43,5 @@ export const AuthService = {
       console.warn("Logout request failed:", e);
       return { success: false };
     }
-  },
-
-  async getProfile() {
-    const response = await api.get("/users/profile");
-    return response.data;
-  },
-
-  async updateProfile(profileData: any) {
-    const response = await api.put("/users/profile", profileData);
-    return response.data;
-  },
+  }
 };

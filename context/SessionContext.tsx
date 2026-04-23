@@ -1,130 +1,80 @@
-import React, { createContext, useState, useCallback, ReactNode } from "react";
-import SessionService from "../api/SessionService"; // Using TS module
+import React, { createContext, useState, useEffect, useCallback, ReactNode } from "react";
+import SessionService from "../api/SessionService";
 import { BackendSession } from "../types/SessionTypes";
 
-// ---------------------
-// 1️⃣ Context
-// ---------------------
-interface LoadingState {
-  list: boolean;
-  add: boolean;
-  remove: boolean;
-}
-
-interface ErrorState {
-  list: string | null;
-  add: string | null;
-  remove: string | null;
-}
-
+// ─── Global Source of Truth for Session Catalog ───
 export interface SessionContextType {
+  /** The full catalog of active backend sessions */
   sessions: BackendSession[];
-  loading: LoadingState;
-  error: ErrorState;
+  loading: boolean;
+  error: string | null;
+  /** Manually refetch the global catalog */
   getSessions: () => Promise<void>;
-  addSession: (sessionData: Partial<BackendSession>) => Promise<BackendSession | null>;
-  removeSession: (id: number | string) => Promise<void>;
 }
 
-export const SessionContext = createContext<SessionContextType | null>(null);
+export const SessionContext = createContext<SessionContextType>({
+  sessions: [],
+  loading: false,
+  error: null,
+  getSessions: async () => {},
+});
 
-// ---------------------
-// 2️⃣ Provider
-// ---------------------
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
-  // State
   const [sessions, setSessions] = useState<BackendSession[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Per-action loading
-  const [loading, setLoading] = useState<LoadingState>({
-    list: false,
-    add: false,
-    remove: false,
-  });
-
-  // Per-action error
-  const [error, setError] = useState<ErrorState>({
-    list: null,
-    add: null,
-    remove: null,
-  });
-
-  // ---------------------
-  // Fetch all sessions
-  // ---------------------
   const getSessions = useCallback(async () => {
-    setLoading(prev => ({ ...prev, list: true }));
-    setError(prev => ({ ...prev, list: null }));
     try {
-      const response = await SessionService.getMyList();
-      let fetchedSessions: BackendSession[] = [];
+      setLoading(true);
+      const res = await SessionService.getList();
       
-      if (Array.isArray(response)) {
-        fetchedSessions = response;
-      } else if (response?.sessions) {
-        fetchedSessions = response.sessions;
-      } else if ((response as any)?.data?.sessions) {
-        fetchedSessions = (response as any).data.sessions;
+      let finalData: BackendSession[] = [];
+      const resAny = res as any;
+
+      if (Array.isArray(resAny)) {
+        finalData = resAny;
+      } else if (resAny?.data) {
+        if (Array.isArray(resAny.data)) {
+          finalData = resAny.data;
+        } else if (Array.isArray(resAny.data?.sessions)) {
+          finalData = resAny.data.sessions;
+        } else if (Array.isArray(resAny.data?.data)) {
+          finalData = resAny.data.data;
+        } else if (typeof resAny.data === 'object') {
+          const vals = Object.values(resAny.data);
+          if (vals.length > 0 && typeof vals[0] === 'object') {
+            finalData = vals as BackendSession[];
+          }
+        }
+      } else if (Array.isArray(resAny?.sessions)) {
+        finalData = resAny.sessions;
       }
-
-      
-      setSessions(fetchedSessions);
-    } catch (err) {
-      console.error(err);
-      setError(prev => ({ ...prev, list: "Failed to load sessions" }));
+        
+      setSessions(finalData || []);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch global sessions");
     } finally {
-      setLoading(prev => ({ ...prev, list: false }));
+      setLoading(false);
     }
   }, []);
 
+  // Boot fetch + 30-second background catalog sync
+  useEffect(() => {
+    getSessions();
+    
+    const intervalId = setInterval(() => {
+      // Periodic background reload using the same function instance
+      getSessions();
+    }, 30000);
 
-  // ---------------------
-  // Add a session
-  // ---------------------
-  const addSession = useCallback(async (sessionData: Partial<BackendSession>) => {
-    setLoading(prev => ({ ...prev, add: true }));
-    setError(prev => ({ ...prev, add: null }));
-    try {
-      const newSession = await SessionService.createSession(sessionData);
-      setSessions(prev => [...prev, newSession]);
-      return newSession;
-    } catch (err) {
-      console.error(err);
-      setError(prev => ({ ...prev, add: "Failed to create session" }));
-      return null;
-    } finally {
-      setLoading(prev => ({ ...prev, add: false }));
-    }
-  }, []);
+    return () => clearInterval(intervalId);
+  }, [getSessions]);
 
-  // ---------------------
-  // Remove a session
-  // ---------------------
-  const removeSession = useCallback(async (id: number | string) => {
-    setLoading(prev => ({ ...prev, remove: true }));
-    setError(prev => ({ ...prev, remove: null }));
-    try {
-      await SessionService.deleteSession(id);
-      setSessions(prev => prev.filter(s => s.session_id !== id));
-    } catch (err) {
-      console.error(err);
-      setError(prev => ({ ...prev, remove: "Failed to delete session" }));
-    } finally {
-      setLoading(prev => ({ ...prev, remove: false }));
-    }
-  }, []);
-
-  // ---------------------
-  // Context value
-  // ---------------------
-  const value: SessionContextType = {
-    sessions,
-    loading,
-    error,
-    getSessions,
-    addSession,
-    removeSession,
-  };
-
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={{ sessions, loading, error, getSessions }}>
+      {children}
+    </SessionContext.Provider>
+  );
 };

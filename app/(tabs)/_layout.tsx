@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useContext } from "react";
 import { Animated, Platform, StyleSheet } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
@@ -7,6 +7,7 @@ import CustomHeader from "@/components/layout/CustomHeader";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { AuthContext } from "@/context/AuthContext";
 
 type TabIconProps = {
   focused: boolean;
@@ -54,6 +55,11 @@ function TabIcon({ focused, color, name }: TabIconProps) {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { user } = useContext(AuthContext);
+
+  const headerUser = {
+    name: user ? `${user.first_name} ${user.last_name}` : "Guest"
+  };
 
   return (
     <Tabs
@@ -104,6 +110,7 @@ export default function TabLayout() {
         options={{
           header: () => (
             <CustomHeader
+              user={headerUser}
               notificationCount={5}
               onNotificationPress={() => console.log("notifications pressed")}
             />
@@ -125,6 +132,7 @@ export default function TabLayout() {
         options={{
           header: () => (
             <CustomHeader
+              user={headerUser}
               notificationCount={2}
               onNotificationPress={() => console.log("notifications pressed")}
             />
@@ -144,7 +152,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="analytics"
         options={{
-          header: () => <CustomHeader />,
+          header: () => <CustomHeader user={headerUser} />,
           headerShown: true,
           title: "Analytics",
           tabBarIcon: ({ color, focused }) => (

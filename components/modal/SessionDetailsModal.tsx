@@ -1,8 +1,14 @@
+import AnalyticsService, { SessionStats } from "@/api/AnalyticsService";
+import { BackendSession } from "@/types/SessionTypes";
+import { formatTime12hr, getSessionTerm } from "@/utils/timeUtils";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useRef } from "react";
+import * as Clipboard from "expo-clipboard";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
+  Linking,
   Modal,
   PanResponder,
   ScrollView,
@@ -12,70 +18,30 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { BackendSession, SessionStatus } from "@/types/SessionTypes";
-import { formatDuration, getSessionTerm, getSessionTimeStatus } from "@/utils/timeUtils";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.82;
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<
-  SessionStatus | "active" | "past" | "upcoming",
-  { label: string; accentColor: string; bgColor: string; borderColor: string; dotColor: string }
-> = {
-  active: { 
-    label: "Active Now", 
-    accentColor: "#0D9488", 
-    bgColor: "#F0FDFA", 
-    borderColor: "#0D948820", 
-    dotColor: "#0D9488" 
-  },
-  "action-now": { 
-    label: "Active Now", 
-    accentColor: "#0D9488", 
-    bgColor: "#F0FDFA", 
-    borderColor: "#0D948820", 
-    dotColor: "#0D9488" 
-  },
-  upcoming: { 
-    label: "Upcoming", 
-    accentColor: "#3B82F6", 
-    bgColor: "#EFF6FF", 
-    borderColor: "#3B82F620", 
-    dotColor: "#3B82F6" 
-  },
-  past: { 
-    label: "Past Session", 
-    accentColor: "#64748B", 
-    bgColor: "#F8FAFC", 
-    borderColor: "#64748B20", 
-    dotColor: "#64748B" 
-  },
-  completed: { 
-    label: "Completed", 
-    accentColor: "#64748B", 
-    bgColor: "#F8FAFC", 
-    borderColor: "#64748B20", 
-    dotColor: "#64748B" 
-  },
-  missed: { 
-    label: "Missed", 
-    accentColor: "#EF4444", 
-    bgColor: "#FEF2F2", 
-    borderColor: "#FECACA", 
-    dotColor: "#EF4444" 
-  },
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+    upcoming: { label: "Upcoming", color: "#3B82F6" },
+    active:   { label: "Active",   color: "#22C55E" },
+    on_break: { label: "On Break", color: "#EAB308" },
+    past:     { label: "Past",     color: "#6B7280" },
 };
 
-
-// ─── Method icons mapping ─────────────────────────────────────────────────────
-const METHOD_ICONS: Record<string, string> = {
-  qr: "qrcode-scan",
-  manual: "pencil-outline",
-  geolocation: "map-marker-radius-outline",
-  nfc: "nfc-tap",
-  face: "face-recognition",
-  fingerprint: "fingerprint",
+// ─── Method config mapping ──────────────────────────────────────────────────────
+const METHOD_CONFIG: Record<string, { icon: string; label: string }> = {
+  qr:          { icon: "qrcode-scan", label: "QR Scanning" },
+  "qr based":  { icon: "qrcode-scan", label: "QR Scanning" },
+  manual:      { icon: "pencil-outline", label: "Manual" },
+  "manual click":{ icon: "pencil-outline", label: "Manual" },
+  geofencing:  { icon: "map-marker-radius-outline", label: "Location-based" },
+  geolocation: { icon: "map-marker-radius-outline", label: "Location-based" },
+  "location check": { icon: "map-marker-radius-outline", label: "Location-based" },
+  nfc:         { icon: "nfc-tap", label: "NFC Tap" },
+  face:        { icon: "face-recognition", label: "Biometrics" },
+  "facial recognition": { icon: "face-recognition", label: "Biometrics" },
+  fingerprint: { icon: "fingerprint", label: "Biometrics" },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -112,16 +78,19 @@ const SectionTitle = ({ title }: { title: string }) => (
   </View>
 );
 
-const MethodBadge = ({ method }: { method: string }) => (
-  <View style={styles.methodBadge}>
-    <MaterialCommunityIcons
-      name={(METHOD_ICONS[method] || "check-circle-outline") as any}
-      size={14}
-      color="#475569"
-    />
-    <Text style={styles.methodText}>{method.toUpperCase()}</Text>
-  </View>
-);
+const MethodBadge = ({ method }: { method: string }) => {
+  const cfg = METHOD_CONFIG[method.toLowerCase()] || { icon: "check-circle-outline", label: method };
+  return (
+    <View style={styles.methodBadge}>
+      <MaterialCommunityIcons
+        name={cfg.icon as any}
+        size={14}
+        color="#475569"
+      />
+      <Text style={styles.methodText}>{cfg.label.toUpperCase()}</Text>
+    </View>
+  );
+};
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 interface Props {
@@ -129,7 +98,13 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onManageSession?: () => void;
+  /** Called when supervisor taps Live Attendance on an active session */
+  onLiveAttendance?: () => void;
   onCheckIn?: () => void;
+  /** Pass true when opening from Participate tab to enable inline check-in */
+  isParticipant?: boolean;
+  /** Called with the chosen method key when user confirms check-in */
+  onCheckInWithMethod?: (method: string) => void;
 }
 
 export const SessionDetailsModal: React.FC<Props> = ({
@@ -137,11 +112,19 @@ export const SessionDetailsModal: React.FC<Props> = ({
   visible,
   onClose,
   onManageSession,
+  onLiveAttendance,
   onCheckIn,
+  isParticipant = false,
+  onCheckInWithMethod,
 }) => {
   const slideAnim = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  // ── Analytics state ──────────────────────────────────────────────────────────
+  const [stats, setStats] = useState<SessionStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Dismiss threshold — if user drags down > 120px, close
   const DISMISS_THRESHOLD = 120;
@@ -181,6 +164,8 @@ export const SessionDetailsModal: React.FC<Props> = ({
   useEffect(() => {
     if (visible) {
       dragY.setValue(0);
+      setCheckingIn(false);
+      setStats(null);
       Animated.parallel([
         Animated.timing(opacityAnim, {
           toValue: 1,
@@ -194,6 +179,15 @@ export const SessionDetailsModal: React.FC<Props> = ({
           useNativeDriver: true,
         }),
       ]).start();
+
+      // Fetch analytics for supervisor sessions (any status)
+      if (session?.role_type === "Supervisors" && session.session_id) {
+        setStatsLoading(true);
+        AnalyticsService.getSessionStats(session.session_id)
+          .then((data) => setStats(data))
+          .catch(() => setStats(null))
+          .finally(() => setStatsLoading(false));
+      }
     } else {
       Animated.parallel([
         Animated.timing(opacityAnim, {
@@ -212,8 +206,8 @@ export const SessionDetailsModal: React.FC<Props> = ({
 
   if (!session) return null;
 
-  const rawStatus = getSessionTimeStatus(session);
-  const cfg = (STATUS_CONFIG as any)[rawStatus] || STATUS_CONFIG["upcoming"];
+  const rawStatus = session.session_status || "upcoming";
+  const { label, color } = STATUS_MAP[rawStatus] ?? STATUS_MAP["upcoming"];
 
   const instructorLabel =
     session.details?.instructor ||
@@ -266,34 +260,13 @@ export const SessionDetailsModal: React.FC<Props> = ({
         </View>
 
         {/* ── Coloured accent bar ── */}
-        <View style={[styles.accentBar, { backgroundColor: cfg.bgColor, borderBottomColor: cfg.borderColor }]}>
-          {/* Left: status dot + label + code */}
+        <View style={[styles.accentBar, { backgroundColor: `${color}10`, borderBottomColor: `${color}30` }]}>
+          {/* Left: status dot + label */}
           <View style={styles.accentLeft}>
-            <View style={[styles.statusDot, { backgroundColor: cfg.dotColor }]} />
-            <Text style={[styles.statusLabel, { color: cfg.accentColor }]}>
-              {cfg.label}
+            <View style={[styles.statusDot, { backgroundColor: color }]} />
+            <Text style={[styles.statusLabel, { color: color }]}>
+              {label}
             </Text>
-            {session.session_code ? (
-              <View style={[styles.codePill, { borderColor: cfg.borderColor }]}>
-                <Text style={[styles.codeText, { color: cfg.accentColor }]}>
-                  {session.session_code}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Right: term + type + policy chips */}
-          <View style={styles.accentRight}>
-            <View style={[styles.chip, { borderColor: cfg.borderColor }]}>
-              <Text style={[styles.chipText, { color: cfg.accentColor }]}>
-                {sessionTerm.label.toUpperCase()}
-              </Text>
-            </View>
-            <View style={[styles.chip, { borderColor: cfg.borderColor }]}>
-              <Text style={[styles.chipText, { color: cfg.accentColor }]}>
-                {formattedSetup}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -319,23 +292,30 @@ export const SessionDetailsModal: React.FC<Props> = ({
 
           <InfoRow
             iconName="calendar-outline"
-            label="Term"
-            value={sessionTerm.label}
+            label="Type"
+            value={session.schedule?.type?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
           />
+          {session.session_code ? (
+            <TouchableOpacity 
+              activeOpacity={0.6} 
+              onPress={() => Clipboard.setStringAsync(session.session_code)}
+            >
+              <InfoRow
+                iconName="key-outline"
+                label="Session Code (Tap to Copy)"
+                value={session.session_code}
+              />
+            </TouchableOpacity>
+          ) : null}
           <InfoRow
             iconName="time-outline"
-            label="Duration"
-            value={formatDuration(session.required_time_rendered)}
+            label="Time"
+            value={`${formatTime12hr(session.schedule?.start_time)} – ${formatTime12hr(session.schedule?.end_time)}`}
           />
           <InfoRow
             iconName="person-outline"
             label="Instructor / Speaker"
             value={instructorLabel}
-          />
-          <InfoRow
-            iconName="layers-outline"
-            label="Session Setup"
-            value={formattedSetup}
           />
 
           {/* ── Additional Dynamic Details ── */}
@@ -392,7 +372,14 @@ export const SessionDetailsModal: React.FC<Props> = ({
             <>
               <SectionTitle title="Remote Access" />
               <InfoRow iconName="videocam-outline" label="Platform" value={session.location?.platform} />
-              <InfoRow iconName="link-outline" label="Join Link" value={session.location?.link} />
+              {session.location?.link && (
+                <TouchableOpacity 
+                  activeOpacity={0.6} 
+                  onPress={() => session.location?.link && Linking.openURL(session.location.link)}
+                >
+                  <InfoRow iconName="link-outline" label="Join Link" value={session.location.link} />
+                </TouchableOpacity>
+              )}
               <InfoRow iconName="key-outline" label="Passcode" value={session.location?.passcode} />
             </>
           )}
@@ -420,6 +407,81 @@ export const SessionDetailsModal: React.FC<Props> = ({
             </>
           )}
 
+          {/* ── Session Analytics (Supervisor only — all statuses) ── */}
+          {session.role_type === "Supervisors" && (
+            <>
+              <SectionTitle title="Session Analytics" />
+              <View style={styles.analyticsCard}>
+                {statsLoading ? (
+                  <View style={{ alignItems: "center", paddingVertical: 18 }}>
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                    <Text style={{ color: "#94A3B8", fontSize: 12, marginTop: 6 }}>Loading analytics…</Text>
+                  </View>
+                ) : stats ? (
+                  <>
+                    {/* ── Summary Group ── */}
+                    <View style={styles.analyticsSummaryGroup}>
+                      <View style={styles.analyticsSummaryRow}>
+                        <MaterialCommunityIcons name="clipboard-list-outline" size={18} color="#475569" />
+                        <Text style={styles.analyticsSummaryLabel}>Total Attendees</Text>
+                        <Text style={styles.analyticsSummaryValue}>{stats.total_enrolled}</Text>
+                      </View>
+                      <View style={styles.analyticsSummaryRowBlue}>
+                        <MaterialCommunityIcons name="account-group-outline" size={18} color="#1D4ED8" />
+                        <Text style={styles.analyticsSummaryLabelBlue}>Active Check-ins</Text>
+                        <Text style={styles.analyticsSummaryValueBlue}>{stats.live_count}</Text>
+                      </View>
+                    </View>
+
+                    {rawStatus === "past" && (
+                      <>
+                        <View style={styles.analyticsDivider} />
+
+                        {/* ── Outcomes ── */}
+                        <Text style={styles.analyticsBreakdownTitle}>Outcomes</Text>
+                        <View style={styles.analyticsRow}>
+                          <View style={styles.statBox}>
+                            <View style={[styles.statDot, { backgroundColor: "#059669" }]} />
+                            <Text style={styles.statLabel}>Complete</Text>
+                            <Text style={[styles.statValue, { color: "#059669" }]}>{stats.outcomes?.complete ?? 0}</Text>
+                          </View>
+                          <View style={styles.statDivider} />
+                          <View style={styles.statBox}>
+                            <View style={[styles.statDot, { backgroundColor: "#D97706" }]} />
+                            <Text style={styles.statLabel}>Incomplete</Text>
+                            <Text style={[styles.statValue, { color: "#D97706" }]}>{stats.outcomes?.incomplete ?? 0}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.analyticsDivider} />
+
+                        {/* ── Punctuality ── */}
+                        <Text style={styles.analyticsBreakdownTitle}>Punctuality</Text>
+                        <View style={styles.analyticsRow}>
+                          <View style={styles.statBox}>
+                            <View style={[styles.statDot, { backgroundColor: "#059669" }]} />
+                            <Text style={styles.statLabel}>On Time</Text>
+                            <Text style={[styles.statValue, { color: "#059669" }]}>{stats.punctuality?.on_time ?? 0}</Text>
+                          </View>
+                          <View style={styles.statDivider} />
+                          <View style={styles.statBox}>
+                            <View style={[styles.statDot, { backgroundColor: "#EA580C" }]} />
+                            <Text style={styles.statLabel}>Late</Text>
+                            <Text style={[styles.statValue, { color: "#EA580C" }]}>{stats.punctuality?.late ?? 0}</Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <Text style={{ color: "#94A3B8", fontSize: 13, textAlign: "center", paddingVertical: 12 }}>
+                    No analytics available yet
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+
           {/* ── Actions ── */}
           <View style={styles.actions}>
             {/* 🧑‍🎓 ATTENDEE Check-in */}
@@ -434,15 +496,31 @@ export const SessionDetailsModal: React.FC<Props> = ({
               </TouchableOpacity>
             )}
 
-            {/* 👨‍🏫 SUPERVISOR Manage */}
-            {session.role_type === "Supervisors" && onManageSession && (
+            {/* 👨‍🏫 SUPERVISOR Live Attendance */}
+            {session.role_type === "Supervisors" && rawStatus !== "past" && (
               <TouchableOpacity
-                style={styles.btnManage}
-                onPress={() => { onClose(); onManageSession(); }}
-                activeOpacity={0.85}
+                style={[
+                  styles.btnManage,
+                  rawStatus !== "active" && { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" }
+                ]}
+                onPress={() => {
+                  if (rawStatus === "active" && onLiveAttendance) {
+                    onLiveAttendance();
+                  }
+                }}
+                activeOpacity={rawStatus === "active" ? 0.85 : 1}
               >
-                <MaterialCommunityIcons name="cog-outline" size={17} color="#fff" />
-                <Text style={styles.btnManageText}>Manage Session</Text>
+                <MaterialCommunityIcons
+                  name="account-eye-outline"
+                  size={17}
+                  color={rawStatus === "active" ? "#fff" : "#94A3B8"}
+                />
+                <Text style={[
+                  styles.btnManageText,
+                  rawStatus !== "active" && { color: "#94A3B8" }
+                ]}>
+                  {rawStatus === "active" ? "View Live Attendees" : "View Live Attendees (Starts soon)"}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -472,7 +550,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
-    // Shadow for elevation
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
@@ -484,7 +561,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     backgroundColor: "#FFFFFF",
-    // Tall hit area makes it easy to grab
     minHeight: 36,
   },
   dragHandle: {
@@ -674,6 +750,126 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
+  // Analytics
+  analyticsCard: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 4,
+  },
+  // Summary row: Total Joined
+  analyticsSummaryGroup: {
+    gap: 8,
+  },
+  analyticsSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  analyticsSummaryLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  analyticsSummaryValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#475569",
+  },
+  analyticsSummaryRowBlue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  analyticsSummaryLabelBlue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1E40AF",
+  },
+  analyticsSummaryValueBlue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1D4ED8",
+  },
+  analyticsDivider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 12,
+  },
+  analyticsBreakdownTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  analyticsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  statBox: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+  statDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    textAlign: "center",
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "#E2E8F0",
+  },
+  btnViewLogs: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  btnViewLogsText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+
   // Actions
   actions: {
     marginTop: 24,
@@ -726,5 +922,52 @@ const styles = StyleSheet.create({
     color: "#CBD5E1",
     marginTop: 3,
     letterSpacing: 0.5,
+  },
+  
+  // Method Picker Styles
+  methodPickerContainer: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  methodPickerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+  noMethodsText: {
+    fontSize: 13,
+    color: "#64748B",
+    fontStyle: "italic",
+    marginBottom: 8,
+  },
+  methodPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  methodPickerRowText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+    marginLeft: 12,
+  },
+  methodPickerCancel: {
+    marginTop: 6,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  methodPickerCancelText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
   },
 });
