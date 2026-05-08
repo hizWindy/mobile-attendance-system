@@ -1,585 +1,655 @@
-import { BarChart } from "@/components/charts/BarChart";
-import { DonutChart } from "@/components/charts/DonutChart";
-import { LineChart } from "@/components/charts/LineChart";
+/**
+ * app/(tabs)/analytics.tsx
+ *
+ * Role-aware Analytics screen:
+ *  - Supervisor view: overview KPIs, punctuality breakdown, sessions list
+ *  - Attendee view: personal KPIs, streak card, time summary, arrival breakdown, session history
+ *  - All data fetched live from the backend via AnalyticsService
+ *  - No third-party chart libraries — custom progress bars and stat cards only
+ */
+
+import AnalyticsService, {
+  AttendeeOverview,
+  AttendeeSessionItem,
+  SupervisorOverview,
+  SupervisorSessionItem,
+} from "@/api/AnalyticsService";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, Text, useColorScheme, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
+import AnalyticsSessionsModal from "@/components/modal/AnalyticsSessionsModal";
 
-// ─── Sample Data ────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ATTENDEE_STATS = {
-  totalPresent: 42,
-  totalAbsent: 5,
-  rate: 89.4,
-  streak: 7,
-  onTime: 38,
-  late: 4,
-};
+function fmtSecs(secs: number): string {
+  if (!secs || secs <= 0) return "0m";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
 
-const ATTENDEE_TREND = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 1 },
-  { label: "Wed", value: 0 },
-  { label: "Thu", value: 1 },
-  { label: "Fri", value: 1 },
-  { label: "Sat", value: 1 },
-  { label: "Sun", value: 0 },
-];
+function fmtPct(n: number): string {
+  return `${n?.toFixed(1) ?? "0.0"}%`;
+}
 
-const ATTENDEE_MONTHLY = [
-  { label: "Jan", value: 18 },
-  { label: "Feb", value: 20 },
-  { label: "Mar", value: 22 },
-  { label: "Apr", value: 19 },
-  { label: "May", value: 24 },
-  { label: "Jun", value: 21 },
-];
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const SUPERVISOR_STATS = {
-  totalSessions: 32,
-  totalAttendees: 248,
-  avgRate: 91.2,
-  peakDay: "Wednesday",
-};
-
-const SESSION_BREAKDOWN = [
-  { label: "Manual", value: 12, color: "#001F54" },
-  { label: "QR", value: 10, color: "#2563eb" },
-  { label: "Location", value: 6, color: "#60a5fa" },
-  { label: "Facial", value: 4, color: "#93c5fd" },
-];
-
-const SESSIONS_PER_WEEK = [
-  { label: "W1", value: 7 },
-  { label: "W2", value: 9 },
-  { label: "W3", value: 6 },
-  { label: "W4", value: 10 },
-  { label: "W5", value: 5 },
-];
-
-const ATTENDANCE_RATE_TREND_WEEK = [
-  { label: "Mon", value: 90 },
-  { label: "Tue", value: 88 },
-  { label: "Wed", value: 75 },
-  { label: "Thu", value: 92 },
-  { label: "Fri", value: 95 },
-  { label: "Sat", value: 80 },
-];
-
-const ATTENDANCE_RATE_TREND_MONTH = [
-  { label: "W1", value: 84 },
-  { label: "W2", value: 91 },
-  { label: "W3", value: 87 },
-  { label: "W4", value: 93 },
-];
-
-const ATTENDANCE_RATE_TREND_YEAR = [
-  { label: "Jan", value: 84 },
-  { label: "Feb", value: 88 },
-  { label: "Mar", value: 91 },
-  { label: "Apr", value: 87 },
-  { label: "May", value: 93 },
-  { label: "Jun", value: 91 },
-];
-
-const ATTENDEE_MONTHLY_YEAR = [
-  { label: "Jan", value: 18 },
-  { label: "Feb", value: 20 },
-  { label: "Mar", value: 22 },
-  { label: "Apr", value: 19 },
-  { label: "May", value: 24 },
-  { label: "Jun", value: 21 },
-];
-
-const ATTENDEE_MONTHLY_MONTH = [
-  { label: "W1", value: 5 },
-  { label: "W2", value: 6 },
-  { label: "W3", value: 4 },
-  { label: "W4", value: 7 },
-];
-
-const ATTENDEE_MONTHLY_WEEK = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 1 },
-  { label: "Wed", value: 0 },
-  { label: "Thu", value: 1 },
-  { label: "Fri", value: 1 },
-  { label: "Sat", value: 1 },
-];
-
-const SESSIONS_WEEK = [
-  { label: "Mon", value: 2 },
-  { label: "Tue", value: 3 },
-  { label: "Wed", value: 1 },
-  { label: "Thu", value: 3 },
-  { label: "Fri", value: 2 },
-];
-
-const SESSIONS_MONTH = [
-  { label: "W1", value: 7 },
-  { label: "W2", value: 9 },
-  { label: "W3", value: 6 },
-  { label: "W4", value: 10 },
-];
-
-const SESSIONS_YEAR = [
-  { label: "Jan", value: 28 },
-  { label: "Feb", value: 32 },
-  { label: "Mar", value: 25 },
-  { label: "Apr", value: 35 },
-  { label: "May", value: 30 },
-  { label: "Jun", value: 38 },
-  { label: "Jul", value: 29 },
-];
-
-type Period = "Week" | "Month" | "Year";
-
-// ─── Sub-Component Types ─────────────────────────────────────────────────────
-
-type KpiCardProps = {
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+interface KpiCardProps {
+  value: string;
   label: string;
-  value: string | number;
-  unit?: string;
-  accent?: string;
   isDark: boolean;
-};
+}
 
-// ─── Period Selector ──────────────────────────────────────────────────────────
-
-function PeriodSelector({ period, onChange, isDark }: { period: Period; onChange: (p: Period) => void; isDark: boolean }) {
+function KpiCard({ value, label, isDark }: KpiCardProps) {
   return (
-    <View className={`flex-row rounded-xl p-1 mb-5 self-end ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
-      {(["Week", "Month", "Year"] as Period[]).map((p) => (
-        <Pressable
-          key={p}
-          onPress={() => onChange(p)}
-          className={`px-3 py-1.5 rounded-lg ${period === p ? (isDark ? "bg-slate-600" : "bg-white") : ""}`}
-          style={period === p ? { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 } : {}}
-        >
-          <Text
-            className={`text-xs font-bold ${
-              period === p
-                ? isDark ? "text-blue-400" : "text-[#001F54]"
-                : isDark ? "text-slate-500" : "text-slate-400"
-            }`}
-          >
-            {p}
-          </Text>
-        </Pressable>
-      ))}
+    <View style={[styles.kpiCard, isDark && styles.kpiCardDark]}>
+      <Text style={[styles.kpiValue, isDark && styles.kpiValueDark]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={styles.kpiLabel} numberOfLines={1}>{label}</Text>
     </View>
   );
 }
 
-// ─── Animated KPI Card ────────────────────────────────────────────────────────
+interface ProgressRowProps {
+  label: string;
+  pct: number;
+  color: string;
+  isDark: boolean;
+}
 
-function KpiCard({ icon, label, value, unit = "", accent = "#001F54", isDark }: KpiCardProps) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const onPressIn = () => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, tension: 300, friction: 10 }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }).start();
-
+function ProgressRow({ label, pct, color, isDark }: ProgressRowProps) {
+  const clampedPct = Math.min(Math.max(pct ?? 0, 0), 100);
   return (
-    <Pressable onPressIn={onPressIn} onPressOut={onPressOut} style={{ flex: 1, marginHorizontal: 4, marginBottom: 12 }}>
-      <Animated.View
-        style={[{
-          transform: [{ scale }],
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderRadius: 16,
-          padding: 16,
-          shadowColor: accent,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 4,
-        }]}
-      >
-        <View
-          className="w-9 h-9 rounded-xl items-center justify-center mb-3"
-          style={{ backgroundColor: accent + "1A" }}
-        >
-          <MaterialCommunityIcons name={icon} size={20} color={accent} />
-        </View>
-        <Text
-          className={`text-2xl font-black ${isDark ? "text-white" : "text-[#001F54]"}`}
-          style={{ letterSpacing: -0.5 }}
-        >
-          {value}
-          <Text className="text-sm font-medium text-slate-400">{unit}</Text>
-        </Text>
-        <Text className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-          {label}
-        </Text>
-      </Animated.View>
-    </Pressable>
+    <View style={styles.progressRow}>
+      <View style={styles.progressLabelRow}>
+        <Text style={[styles.progressLabel, isDark && styles.textSecondaryDark]}>{label}</Text>
+        <Text style={[styles.progressPct, { color }]}>{fmtPct(clampedPct)}</Text>
+      </View>
+      <View style={[styles.progressTrack, isDark && styles.progressTrackDark]}>
+        <View style={[styles.progressFill, { width: `${clampedPct}%` as any, backgroundColor: color }]} />
+      </View>
+    </View>
   );
 }
 
-type ChartCardProps = {
+interface SectionHeaderProps {
   title: string;
-  subtitle?: string;
   isDark: boolean;
-  children: React.ReactNode;
-};
+  onSeeAll?: () => void;
+  seeAllCount?: number;
+}
 
-function ChartCard({ title, subtitle, isDark, children }: ChartCardProps) {
+function SectionTitle({ title, isDark, onSeeAll, seeAllCount }: SectionHeaderProps) {
   return (
-    <View
-      className={`w-full rounded-2xl p-4 mb-4 ${isDark ? "bg-slate-800" : "bg-white"}`}
-      style={{
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.07,
-        shadowRadius: 8,
-        elevation: 4,
-      }}
-    >
-      <Text
-        className={`text-base font-bold mb-0.5 ${isDark ? "text-white" : "text-[#001F54]"}`}
-      >
-        {title}
-      </Text>
-      {subtitle && (
-        <Text className={`text-xs mb-4 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-          {subtitle}
-        </Text>
+    <View style={styles.sectionTitleRow}>
+      <View style={styles.sectionTitleLeft}>
+        <View style={styles.sectionAccent} />
+        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{title}</Text>
+      </View>
+      {onSeeAll && (
+        <TouchableOpacity style={styles.seeAllBtn} onPress={onSeeAll}>
+          <Text style={styles.seeAllText}>See All {seeAllCount ? `(${seeAllCount}) ` : ""}→</Text>
+        </TouchableOpacity>
       )}
-      {children}
     </View>
   );
 }
 
-type InsightRowProps = {
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-  text: string;
-  positive?: boolean;
-  isDark: boolean;
-};
+interface ResultBadgeProps {
+  status: string;
+}
 
-function InsightRow({ icon, text, positive = true, isDark }: InsightRowProps) {
-  const color = positive ? "#16a34a" : "#dc2626";
-  const bg = positive ? "#f0fdf4" : "#fef2f2";
-  const darkBg = positive ? "rgba(22,163,74,0.12)" : "rgba(220,38,38,0.12)";
+function ResultBadge({ status }: ResultBadgeProps) {
+  const map: Record<string, { bg: string; text: string; label: string }> = {
+    complete:   { bg: "#EEF2FF", text: "#4F46E5", label: "Complete"   },
+    incomplete: { bg: "#FFF7ED", text: "#F97316", label: "Incomplete" },
+    missed:     { bg: "#FEF2F2", text: "#EF4444", label: "Missed"     },
+    no_checkout:{ bg: "#F9FAFB", text: "#9CA3AF", label: "No Checkout"},
+  };
+  const cfg = map[status] ?? { bg: "#F3F4F6", text: "#6B7280", label: status };
   return (
-    <View
-      className="flex-row items-center rounded-xl px-3 py-2.5 mb-2"
-      style={{ backgroundColor: isDark ? darkBg : bg }}
-    >
-      <MaterialCommunityIcons name={icon} size={16} color={color} />
-      <Text className="ml-2 text-xs font-medium flex-1" style={{ color }}>
-        {text}
-      </Text>
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.text }]}>{cfg.label}</Text>
     </View>
   );
 }
 
-// ─── Attendee Analytics ───────────────────────────────────────────────────────
+interface ArrivalBadgeProps {
+  status: string;
+}
 
-function AttendeeAnalytics({ isDark, period }: { isDark: boolean; period: Period }) {
-  const attendanceTrend =
-    period === "Week"
-      ? ATTENDEE_MONTHLY_WEEK
-      : period === "Month"
-      ? ATTENDEE_MONTHLY_MONTH
-      : ATTENDEE_MONTHLY_YEAR;
-  const donutData = [
-    { label: "Present", value: ATTENDEE_STATS.totalPresent, color: "#001F54" },
-    { label: "Absent", value: ATTENDEE_STATS.totalAbsent, color: "#e2e8f0" },
-  ];
+function ArrivalBadge({ status }: ArrivalBadgeProps) {
+  const map: Record<string, { bg: string; text: string; label: string }> = {
+    "on-time": { bg: "#F0FDF4", text: "#22C55E", label: "On-time" },
+    late:      { bg: "#FFF7ED", text: "#F97316", label: "Late"    },
+    missed:    { bg: "#FEF2F2", text: "#EF4444", label: "Missed"  },
+  };
+  const cfg = map[status] ?? { bg: "#F3F4F6", text: "#6B7280", label: status };
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.text }]}>{cfg.label}</Text>
+    </View>
+  );
+}
 
+// ─── Empty / Error / Loading ──────────────────────────────────────────────────
+
+function LoadingView() {
+  return (
+    <View style={styles.centerWrap}>
+      <ActivityIndicator size="large" color="#4F46E5" />
+      <Text style={styles.centerText}>Loading analytics...</Text>
+    </View>
+  );
+}
+
+function ErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <View style={styles.centerWrap}>
+      <MaterialCommunityIcons name="wifi-alert" size={40} color="#EF4444" />
+      <Text style={[styles.centerText, { color: "#EF4444", marginTop: 12 }]}>{message}</Text>
+      <TouchableOpacity style={styles.retryBtn} onPress={onRetry}>
+        <Text style={styles.retryText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Supervisor View ──────────────────────────────────────────────────────────
+
+interface SupervisorViewProps {
+  isDark: boolean;
+  overview: SupervisorOverview;
+  sessions: SupervisorSessionItem[];
+  onShowAll: () => void;
+}
+
+function SupervisorView({ isDark, overview, sessions, onShowAll }: SupervisorViewProps) {
   return (
     <>
       {/* KPI Row 1 */}
-      <View className="flex-row mb-0">
-        <KpiCard
-          icon="calendar-check"
-          label="Days Present"
-          value={ATTENDEE_STATS.totalPresent}
-          accent="#001F54"
-          isDark={isDark}
-        />
-        <KpiCard
-          icon="percent"
-          label="Attendance Rate"
-          value={`${ATTENDEE_STATS.rate}`}
-          unit="%"
-          accent="#2563eb"
-          isDark={isDark}
-        />
-      </View>
-      <View className="flex-row mb-4">
-        <KpiCard
-          icon="fire"
-          label="Current Streak"
-          value={ATTENDEE_STATS.streak}
-          unit=" days"
-          accent="#f59e0b"
-          isDark={isDark}
-        />
-        <KpiCard
-          icon="clock-fast"
-          label="On-Time Rate"
-          value={Math.round((ATTENDEE_STATS.onTime / ATTENDEE_STATS.totalPresent) * 100)}
-          unit="%"
-          accent="#16a34a"
-          isDark={isDark}
-        />
+      <View style={styles.kpiRow}>
+        <KpiCard value={String(overview.total_sessions)}  label="Sessions"  isDark={isDark} />
+        <KpiCard value={String(overview.total_enrolled)}  label="Enrolled"  isDark={isDark} />
+        <KpiCard value={fmtPct(overview.overall_completion_rate)} label="Complete" isDark={isDark} />
       </View>
 
-      {/* Presence Breakdown Donut */}
-      <ChartCard
-        title="Presence Breakdown"
-        subtitle="Overall check-in summary"
-        isDark={isDark}
-      >
-        <View className="flex-row items-center justify-between">
-          <DonutChart data={donutData} size={140} thickness={26} />
-          <View className="flex-1 ml-6">
-            {donutData.map((d) => (
-              <View key={d.label} className="flex-row items-center mb-3">
-                <View
-                  className="w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: d.color }}
-                />
-                <View>
-                  <Text
-                    className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-700"}`}
-                  >
-                    {d.value}
+      {/* KPI Row 2 */}
+      <View style={styles.kpiRow}>
+        <KpiCard value={String(overview.active_sessions)}   label="Active"      isDark={isDark} />
+        <KpiCard value={fmtPct(overview.overall_attendance_rate)} label="Attendance" isDark={isDark} />
+        <KpiCard value={String(overview.total_no_checkout)} label="No Checkout" isDark={isDark} />
+      </View>
+
+      {/* Punctuality Breakdown */}
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        <SectionTitle title="Punctuality Breakdown" isDark={isDark} />
+        <View style={styles.cardBody}>
+          <ProgressRow label="On-time" pct={overview.overall_on_time_rate} color="#22C55E" isDark={isDark} />
+          <ProgressRow label="Late"    pct={overview.overall_late_rate}    color="#F97316" isDark={isDark} />
+          <ProgressRow label="Missed"  pct={overview.overall_missed_rate}  color="#EF4444" isDark={isDark} />
+        </View>
+      </View>
+
+      {/* Sessions List */}
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        <SectionTitle 
+          title="My Sessions Performance" 
+          isDark={isDark} 
+          onSeeAll={sessions.length > 3 ? onShowAll : undefined}
+          seeAllCount={sessions.length > 3 ? sessions.length : undefined}
+        />
+        {sessions.length === 0 ? (
+          <Text style={styles.emptyText}>No sessions found.</Text>
+        ) : (
+          sessions.slice(0, 3).map((s, i) => (
+            <View key={s.session_id} style={[styles.sessionRow, i > 0 && styles.sessionRowBorder, i > 0 && isDark && styles.sessionRowBorderDark]}>
+              <View style={styles.sessionRowTop}>
+                <Text style={[styles.sessionName, isDark && styles.textPrimaryDark]} numberOfLines={1}>
+                  {s.session_name}
+                </Text>
+                <View style={[styles.statusPill, s.session_status === "active" ? styles.statusActive : styles.statusPast]}>
+                  <Text style={[styles.statusPillText, s.session_status === "active" ? styles.statusActiveText : styles.statusPastText]}>
+                    {s.session_status}
                   </Text>
-                  <Text className="text-xs text-slate-400">{d.label}</Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
-      </ChartCard>
-
-      <ChartCard
-        title="Attendance Trend"
-        subtitle={`Days attended — ${period.toLowerCase()} view`}
-        isDark={isDark}
-      >
-        <LineChart data={attendanceTrend} color="#001F54" height={140} />
-      </ChartCard>
-
-      <ChartCard
-        title="Activity by Day"
-        subtitle="1 = Present, 0 = Absent"
-        isDark={isDark}
-      >
-        <BarChart data={ATTENDEE_TREND} color="#2563eb" height={120} />
-      </ChartCard>
-
-      {/* AI Insights */}
-      <ChartCard title="Insights" isDark={isDark}>
-        <InsightRow
-          icon="trending-up"
-          text="Your attendance improved by 4.2% compared to last month. Keep it up!"
-          positive
-          isDark={isDark}
-        />
-        <InsightRow
-          icon="fire"
-          text={`You're on a ${ATTENDEE_STATS.streak}-day streak. Don't break it!`}
-          positive
-          isDark={isDark}
-        />
-        <InsightRow
-          icon="alert-circle-outline"
-          text="You missed 2 sessions this month. Review your schedule."
-          positive={false}
-          isDark={isDark}
-        />
-        <InsightRow
-          icon="clock-check-outline"
-          text="You arrive on-time 90% of the time — excellent punctuality!"
-          positive
-          isDark={isDark}
-        />
-      </ChartCard>
+              <View style={styles.sessionStats}>
+                <View style={styles.sessionStatItem}>
+                  <Text style={[styles.sessionStatValue, isDark && styles.textPrimaryDark]}>{s.total_enrolled}</Text>
+                  <Text style={styles.sessionStatLabel}>Enrolled</Text>
+                </View>
+                <View style={styles.sessionStatItem}>
+                  <Text style={[styles.sessionStatValue, { color: "#22C55E" }]}>{fmtPct(s.on_time_rate)}</Text>
+                  <Text style={styles.sessionStatLabel}>On-time</Text>
+                </View>
+                <View style={styles.sessionStatItem}>
+                  <Text style={[styles.sessionStatValue, { color: "#F97316" }]}>{fmtPct(s.late_rate)}</Text>
+                  <Text style={styles.sessionStatLabel}>Late</Text>
+                </View>
+                <View style={styles.sessionStatItem}>
+                  <Text style={[styles.sessionStatValue, { color: "#EF4444" }]}>{fmtPct(s.missed_rate)}</Text>
+                  <Text style={styles.sessionStatLabel}>Missed</Text>
+                </View>
+              </View>
+              <ProgressRow label="Completion" pct={s.completion_rate} color="#4F46E5" isDark={isDark} />
+            </View>
+          ))
+        )}
+      </View>
     </>
   );
 }
 
-// ─── Supervisor Analytics ─────────────────────────────────────────────────────
+// ─── Attendee View ────────────────────────────────────────────────────────────
 
-function SupervisorAnalytics({ isDark, period }: { isDark: boolean; period: Period }) {
-  const sessionsTrend =
-    period === "Week"
-      ? SESSIONS_WEEK
-      : period === "Month"
-      ? SESSIONS_MONTH
-      : SESSIONS_YEAR;
+interface AttendeeViewProps {
+  isDark: boolean;
+  overview: AttendeeOverview;
+  sessions: AttendeeSessionItem[];
+  onShowAll: () => void;
+}
 
-  const rateTrend =
-    period === "Week"
-      ? ATTENDANCE_RATE_TREND_WEEK
-      : period === "Month"
-      ? ATTENDANCE_RATE_TREND_MONTH
-      : ATTENDANCE_RATE_TREND_YEAR;
+function AttendeeView({ isDark, overview, sessions, onShowAll }: AttendeeViewProps) {
   return (
     <>
-      {/* KPI Row */}
-      <View className="flex-row mb-0">
-        <KpiCard
-          icon="presentation"
-          label="Sessions Created"
-          value={SUPERVISOR_STATS.totalSessions}
-          accent="#001F54"
-          isDark={isDark}
-        />
-        <KpiCard
-          icon="account-group"
-          label="Total Attendees"
-          value={SUPERVISOR_STATS.totalAttendees}
-          accent="#2563eb"
-          isDark={isDark}
-        />
-      </View>
-      <View className="flex-row mb-4">
-        <KpiCard
-          icon="chart-line"
-          label="Avg. Rate"
-          value={`${SUPERVISOR_STATS.avgRate}`}
-          unit="%"
-          accent="#16a34a"
-          isDark={isDark}
-        />
-        <KpiCard
-          icon="calendar-star"
-          label="Peak Day"
-          value={SUPERVISOR_STATS.peakDay}
-          accent="#f59e0b"
-          isDark={isDark}
-        />
+      {/* KPI Row 1 */}
+      <View style={styles.kpiRow}>
+        <KpiCard value={String(overview.total_sessions_joined)} label="Joined"   isDark={isDark} />
+        <KpiCard value={fmtPct(overview.completion_rate)}       label="Complete" isDark={isDark} />
+        <KpiCard value={fmtPct(overview.on_time_rate)}          label="On-time"  isDark={isDark} />
       </View>
 
-      <ChartCard
-        title="Sessions Hosted"
-        subtitle={`Frequency — ${period.toLowerCase()} view`}
-        isDark={isDark}
-      >
-        <BarChart data={sessionsTrend} color="#001F54" height={140} />
-      </ChartCard>
+      {/* Streak Card */}
+      <View style={styles.streakCard}>
+        <View style={styles.streakItem}>
+          <Text style={styles.streakEmoji}>🔥</Text>
+          <Text style={styles.streakValue}>{overview.current_streak}</Text>
+          <Text style={styles.streakLabel}>Current Streak</Text>
+        </View>
+        <View style={styles.streakDivider} />
+        <View style={styles.streakItem}>
+          <Text style={styles.streakEmoji}>🏆</Text>
+          <Text style={[styles.streakValue, styles.streakLongest]}>{overview.longest_streak}</Text>
+          <Text style={styles.streakLabel}>Longest Streak</Text>
+        </View>
+      </View>
 
-      <ChartCard
-        title="Attendance Rate Trend"
-        subtitle={`Average attendance rate — ${period.toLowerCase()} view`}
-        isDark={isDark}
-      >
-        <LineChart data={rateTrend} color="#2563eb" height={140} />
-      </ChartCard>
-
-      {/* Method Breakdown Donut */}
-      <ChartCard
-        title="Check-In Method Breakdown"
-        subtitle="Sessions by method used"
-        isDark={isDark}
-      >
-        <View className="flex-row items-center justify-between">
-          <DonutChart data={SESSION_BREAKDOWN} size={140} thickness={26} />
-          <View className="flex-1 ml-6">
-            {SESSION_BREAKDOWN.map((d) => (
-              <View key={d.label} className="flex-row items-center mb-3">
-                <View
-                  className="w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: d.color }}
-                />
-                <View>
-                  <Text
-                    className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-700"}`}
-                  >
-                    {d.value}
-                  </Text>
-                  <Text className="text-xs text-slate-400">{d.label}</Text>
-                </View>
-              </View>
-            ))}
+      {/* Time Summary */}
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        <SectionTitle title="⏱️ Time Summary" isDark={isDark} />
+        <View style={styles.timeSummary}>
+          <View style={styles.timeSummaryItem}>
+            <Text style={[styles.timeSummaryValue, isDark && styles.textPrimaryDark]}>
+              {fmtSecs(overview.total_time_rendered_secs)}
+            </Text>
+            <Text style={styles.timeSummaryLabel}>Total Time</Text>
+          </View>
+          <View style={[styles.timeDivider, isDark && styles.timeDividerDark]} />
+          <View style={styles.timeSummaryItem}>
+            <Text style={[styles.timeSummaryValue, isDark && styles.textPrimaryDark]}>
+              {fmtSecs(overview.avg_time_rendered_secs)}
+            </Text>
+            <Text style={styles.timeSummaryLabel}>Avg per Session</Text>
+          </View>
+          <View style={[styles.timeDivider, isDark && styles.timeDividerDark]} />
+          <View style={styles.timeSummaryItem}>
+            <Text style={[styles.timeSummaryValue, { color: "#EF4444" }]}>{overview.no_checkout_count}</Text>
+            <Text style={styles.timeSummaryLabel}>No Checkout</Text>
           </View>
         </View>
-      </ChartCard>
+      </View>
 
-      {/* Supervisor Insights */}
-      <ChartCard title="Insights" isDark={isDark}>
-        <InsightRow
-          icon="trending-up"
-          text="Session count grew 25% vs. last quarter. Great momentum!"
-          positive
-          isDark={isDark}
+      {/* Arrival Breakdown */}
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        <SectionTitle title="Arrival Breakdown" isDark={isDark} />
+        <View style={styles.cardBody}>
+          <ProgressRow label="On-time" pct={overview.on_time_rate} color="#22C55E" isDark={isDark} />
+          <ProgressRow label="Late"    pct={overview.late_rate}    color="#F97316" isDark={isDark} />
+          <ProgressRow label="Missed"  pct={overview.missed_rate}  color="#EF4444" isDark={isDark} />
+        </View>
+      </View>
+
+      {/* Session History */}
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        <SectionTitle 
+          title="My Session History" 
+          isDark={isDark} 
+          onSeeAll={sessions.length > 3 ? onShowAll : undefined}
+          seeAllCount={sessions.length > 3 ? sessions.length : undefined}
         />
-        <InsightRow
-          icon="check-circle-outline"
-          text="Your sessions maintain a 91.2% average attendance — above target."
-          positive
-          isDark={isDark}
-        />
-        <InsightRow
-          icon="calendar-alert"
-          text="Week 3 had only 6 sessions. Consider scheduling more mid-month."
-          positive={false}
-          isDark={isDark}
-        />
-        <InsightRow
-          icon="qrcode-scan"
-          text="QR-based check-in is highly adopted. Consider expanding it further."
-          positive
-          isDark={isDark}
-        />
-      </ChartCard>
+        {sessions.length === 0 ? (
+          <Text style={styles.emptyText}>No sessions found.</Text>
+        ) : (
+          sessions.slice(0, 3).map((s, i) => (
+            <View key={s.session_id} style={[styles.sessionRow, i > 0 && styles.sessionRowBorder, i > 0 && isDark && styles.sessionRowBorderDark]}>
+              <View style={styles.sessionRowTop}>
+                <Text style={[styles.sessionName, isDark && styles.textPrimaryDark]} numberOfLines={1}>
+                  {s.session_name}
+                </Text>
+                <ResultBadge status={s.result_status} />
+              </View>
+              <View style={styles.sessionBadgeRow}>
+                <ArrivalBadge status={s.arrival_status} />
+                <Text style={styles.sessionTimeText}>
+                  {fmtSecs(s.total_time_rendered_secs)} rendered
+                </Text>
+              </View>
+              <ProgressRow
+                label="Completion"
+                pct={s.completion_percentage}
+                color="#4F46E5"
+                isDark={isDark}
+              />
+            </View>
+          ))
+        )}
+      </View>
     </>
   );
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-const AnalyticsScreen = () => {
+export default function AnalyticsScreen() {
+  const isDark = useColorScheme() === "dark";
   const [activeTab, setActiveTab] = useState<"attendee" | "supervisor">("attendee");
-  const [period, setPeriod] = useState<Period>("Month");
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalRole, setModalRole] = useState<"supervisor" | "attendee" | null>(null);
+
+  // Supervisor state
+  const [supOverview, setSupOverview] = useState<SupervisorOverview | null>(null);
+  const [supSessions, setSupSessions] = useState<SupervisorSessionItem[]>([]);
+  const [supLoading, setSupLoading] = useState(false);
+  const [supError, setSupError] = useState<string | null>(null);
+
+  // Attendee state
+  const [attOverview, setAttOverview] = useState<AttendeeOverview | null>(null);
+  const [attSessions, setAttSessions] = useState<AttendeeSessionItem[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
+  const [attError, setAttError] = useState<string | null>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchSupervisor = useCallback(async () => {
+    try {
+      setSupLoading(true);
+      setSupError(null);
+      const [ovRes, sessRes] = await Promise.all([
+        AnalyticsService.getSupervisorOverview(),
+        AnalyticsService.getSupervisorSessions(),
+      ]);
+      setSupOverview(ovRes.data);
+      setSupSessions(sessRes.data ?? []);
+    } catch (e: any) {
+      setSupError(e?.response?.data?.detail ?? e?.message ?? "Failed to load supervisor analytics");
+    } finally {
+      setSupLoading(false);
+    }
+  }, []);
+
+  const fetchAttendee = useCallback(async () => {
+    try {
+      setAttLoading(true);
+      setAttError(null);
+      const [ovRes, sessRes] = await Promise.all([
+        AnalyticsService.getAttendeeOverview(),
+        AnalyticsService.getAttendeeSessions(),
+      ]);
+      setAttOverview(ovRes.data);
+      setAttSessions(sessRes.data ?? []);
+    } catch (e: any) {
+      setAttError(e?.response?.data?.detail ?? e?.message ?? "Failed to load attendee analytics");
+    } finally {
+      setAttLoading(false);
+    }
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    await Promise.all([fetchSupervisor(), fetchAttendee()]);
+  }, [fetchSupervisor, fetchAttendee]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
+
+  const isLoading  = activeTab === "supervisor" ? supLoading  : attLoading;
+  const error      = activeTab === "supervisor" ? supError    : attError;
+  const onRetry    = activeTab === "supervisor" ? fetchSupervisor : fetchAttendee;
+
+  const renderContent = () => {
+    if (isLoading && !refreshing) return <LoadingView />;
+    if (error) return <ErrorView message={error} onRetry={onRetry} />;
+
+    if (activeTab === "supervisor") {
+      if (!supOverview) return <LoadingView />;
+      return (
+        <SupervisorView 
+          isDark={isDark} 
+          overview={supOverview} 
+          sessions={supSessions} 
+          onShowAll={() => {
+            setModalRole("supervisor");
+            setModalVisible(true);
+          }} 
+        />
+      );
+    }
+
+    if (!attOverview) return <LoadingView />;
+    return (
+      <AttendeeView 
+        isDark={isDark} 
+        overview={attOverview} 
+        sessions={attSessions} 
+        onShowAll={() => {
+          setModalRole("attendee");
+          setModalVisible(true);
+        }} 
+      />
+    );
+  };
 
   return (
-    <View className={`flex-1 ${isDark ? "bg-slate-900" : "bg-[#e8eff8]"}`}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#4F46E5"
+            colors={["#4F46E5"]}
+          />
+        }
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, isDark && styles.textPrimaryDark]}>Analytics</Text>
+          <Text style={styles.headerSubtitle}>
+            {activeTab === "supervisor" ? "Your sessions at a glance" : "Your personal performance"}
+          </Text>
+        </View>
+
         {/* Role Toggle */}
-        <View className="mb-5">
+        <View style={styles.tabWrap}>
           <SegmentedTab
             options={[
-              { key: "attendee", label: "Attendee" },
-              { key: "supervisor", label: "Supervisor" },
+              { key: "attendee",   label: "📋  As Attendee"   },
+              { key: "supervisor", label: "📊  As Supervisor" },
             ]}
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key as "attendee" | "supervisor")}
           />
         </View>
 
-        {/* Section Title */}
-        <View className="flex-row items-center mb-4">
-          <View className="w-1 h-6 bg-[#001F54] rounded-full mr-2" />
-          <Text
-            className={`text-xl font-extrabold ${isDark ? "text-white" : "text-[#001F54]"}`}
-          >
-            {activeTab === "attendee" ? "My Attendance" : "Session Insights"}
-          </Text>
-        </View>
-
-        {/* Period Selector */}
-        <PeriodSelector period={period} onChange={setPeriod} isDark={isDark} />
-
-        {activeTab === "attendee" ? (
-          <AttendeeAnalytics isDark={isDark} period={period} />
-        ) : (
-          <SupervisorAnalytics isDark={isDark} period={period} />
-        )}
+        {renderContent()}
       </ScrollView>
+
+      <AnalyticsSessionsModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        role={modalRole}
+      />
     </View>
   );
-};
+}
 
-export default AnalyticsScreen;
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  // Layout
+  container:      { flex: 1, backgroundColor: "#F9FAFB" },
+  containerDark:  { backgroundColor: "#0F172A" },
+  scroll:         { padding: 16, paddingBottom: 48 },
+
+  // Header
+  header:         { marginBottom: 16 },
+  headerTitle:    { fontSize: 24, fontWeight: "800", color: "#111827", letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 13, fontWeight: "500", color: "#9CA3AF", marginTop: 3 },
+
+  // Tab toggle
+  tabWrap: { marginBottom: 20 },
+
+  // KPI Cards
+  kpiRow:     { flexDirection: "row", gap: 10, marginBottom: 10 },
+  kpiCard:    {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  kpiCardDark:  { backgroundColor: "#1E293B" },
+  kpiValue:     { fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 4 },
+  kpiValueDark: { color: "#F9FAFB" },
+  kpiLabel:     { fontSize: 11, fontWeight: "500", color: "#9CA3AF", textAlign: "center" },
+
+  // Streak Card
+  streakCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    marginBottom: 10,
+    shadowColor: "#F97316",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  streakItem:    { alignItems: "center", flex: 1 },
+  streakEmoji:   { fontSize: 28, marginBottom: 4 },
+  streakValue:   { fontSize: 28, fontWeight: "700", color: "#EA580C" },
+  streakLongest: { color: "#D97706" },
+  streakLabel:   { fontSize: 12, fontWeight: "600", color: "#9A3412", marginTop: 4 },
+  streakDivider: { width: 1, height: 60, backgroundColor: "#FED7AA" },
+
+  // Section title
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  sectionTitleLeft:{ flexDirection: "row", alignItems: "center" },
+  sectionAccent:   { width: 3, height: 18, borderRadius: 2, backgroundColor: "#4F46E5", marginRight: 8 },
+  sectionTitle:    { fontSize: 15, fontWeight: "700", color: "#111827" },
+  sectionTitleDark:{ color: "#F9FAFB" },
+  seeAllBtn:       { paddingVertical: 4, paddingHorizontal: 8 },
+  seeAllText:      { fontSize: 12, fontWeight: "700", color: "#4F46E5" },
+
+  // Generic card
+  card:     {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardDark: { backgroundColor: "#1E293B" },
+  cardBody: { gap: 12 },
+
+  // Progress bar
+  progressRow:     { marginBottom: 10 },
+  progressLabelRow:{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  progressLabel:   { fontSize: 13, fontWeight: "500", color: "#6B7280" },
+  progressPct:     { fontSize: 13, fontWeight: "700" },
+  progressTrack:   { height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" },
+  progressTrackDark:{ backgroundColor: "#334155" },
+  progressFill:    { height: 8, borderRadius: 4 },
+
+  // Time summary
+  timeSummary:     { flexDirection: "row", justifyContent: "space-around", paddingVertical: 8 },
+  timeSummaryItem: { alignItems: "center", flex: 1 },
+  timeSummaryValue:{ fontSize: 20, fontWeight: "700", color: "#111827" },
+  timeSummaryLabel:{ fontSize: 11, fontWeight: "500", color: "#9CA3AF", marginTop: 4 },
+  timeDivider:     { width: 1, backgroundColor: "#E5E7EB", marginVertical: 4 },
+  timeDividerDark: { backgroundColor: "#334155" },
+
+  // Session rows inside cards
+  sessionRow:           { paddingVertical: 12 },
+  sessionRowBorder:     { borderTopWidth: 1, borderTopColor: "#E5E7EB" },
+  sessionRowBorderDark: { borderTopColor: "#334155" },
+  sessionRowTop:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  sessionName:          { fontSize: 14, fontWeight: "600", color: "#111827", flex: 1, marginRight: 8 },
+  sessionStats:         { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  sessionStatItem:      { alignItems: "center" },
+  sessionStatValue:     { fontSize: 15, fontWeight: "700", color: "#111827" },
+  sessionStatLabel:     { fontSize: 10, color: "#9CA3AF", marginTop: 2 },
+  sessionBadgeRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  sessionTimeText:      { fontSize: 12, color: "#9CA3AF", fontWeight: "500" },
+
+  // Status pill
+  statusPill:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusActive:     { backgroundColor: "#DCFCE7" },
+  statusPast:       { backgroundColor: "#F1F5F9" },
+  statusPillText:   { fontSize: 11, fontWeight: "600" },
+  statusActiveText: { color: "#16A34A" },
+  statusPastText:   { color: "#64748B" },
+
+  // Badges
+  badge:     { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
+  badgeText: { fontSize: 11, fontWeight: "600" },
+
+  // Empty / Error / Loading
+  emptyText:  { fontSize: 14, color: "#9CA3AF", textAlign: "center", paddingVertical: 20 },
+  centerWrap: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 32 },
+  centerText: { fontSize: 14, color: "#6B7280", marginTop: 16, textAlign: "center" },
+  retryBtn:   { marginTop: 20, backgroundColor: "#4F46E5", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 },
+  retryText:  { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+
+  // Dark mode text helpers
+  textPrimaryDark:   { color: "#F9FAFB" },
+  textSecondaryDark: { color: "#94A3B8" },
+});

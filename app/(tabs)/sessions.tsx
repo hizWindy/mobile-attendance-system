@@ -7,37 +7,39 @@
 // The SessionDetailsModal is lifted to SCREEN LEVEL so it renders outside the ScrollView,
 // which guarantees it always stacks correctly on every platform.
 
-import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useColorScheme,
-  Alert,
-} from "react-native";
-import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    useColorScheme,
+} from "react-native";
 
-import { SessionCard } from "@/components/cards/SessionCard";
 import { AttendanceCard } from "@/components/cards/AttendanceCard";
-import { SessionDetailsModal } from "@/components/modal/SessionDetailsModal";
+import { SessionCard } from "@/components/cards/SessionCard";
+import { AttendanceLogsModal } from "@/components/modal/AttendanceLogsModal";
 import { CheckInModal } from "@/components/modal/CheckInModal";
 import { LiveAttendanceModal } from "@/components/modal/LiveAttendanceModal";
-import { AttendanceLogsModal } from "@/components/modal/AttendanceLogsModal";
-import { ActionToast } from "@/components/ui/ActionToast";
+import { SessionDetailsModal } from "@/components/modal/SessionDetailsModal";
+import { UpdateSessionModal } from "@/components/modal/UpdateSessionModal";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
-import { useSession } from "@/hooks/useSession";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { useMyAttendance } from "@/hooks/useMyAttendance";
+import { useSession } from "@/hooks/useSession";
+import { AttendanceCategory, AttendanceRecord } from "@/types/AttendanceTypes";
 import { BackendSession } from "@/types/SessionTypes";
-import { AttendanceRecord, AttendanceCategory } from "@/types/AttendanceTypes";
 
-import { getTimeStatus } from "@/hooks/useSessionStatus";
 import AttendanceService, { SessionJoinData } from "@/api/AttendanceService";
+import SessionService from "@/api/SessionService";
 import { LocationContext } from "@/context/LocationContext";
+import { getTimeStatus } from "@/hooks/useSessionStatus";
 
 // ─── Filter types ─────────────────────────────────────────────────────────────
 type MainTab = "manage" | "participate";
@@ -84,10 +86,11 @@ const ErrorState = ({
 interface ManageTabProps {
   onViewSession: (session: BackendSession) => void;
   onLiveAttendance: (session: BackendSession) => void;
+  onSessionDeleted?: (sessionName: string) => void;
 }
 
-const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance }) => {
-  const { sessions, loading, error, getSessions } = useSession();
+const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance, onSessionDeleted }) => {
+  const { sessions, loading, error, getSessions, removeSession } = useSession();
   const [filter, setFilter] = useState<ManageFilter>("all");
 
   // Re-fetch every time this screen is focused
@@ -206,6 +209,14 @@ const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance }
                 onManageSession={() => onViewSession(normalizedSession)}
                 onCheckIn={() => onViewSession(normalizedSession)}
                 onLiveAttendance={() => onLiveAttendance(normalizedSession)}
+                onDeleteSession={async (sessionId) => {
+                  try {
+                    await removeSession(sessionId);
+                    onSessionDeleted?.(normalizedSession.session_name);
+                  } catch {
+                    // Error already handled inside removeSession
+                  }
+                }}
               />
             );
           })
@@ -306,7 +317,7 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
             ? "#DC2626"
             : filter === "ongoing"
               ? "#059669"
-              : "#2563EB"
+              : "#001F54"
         }
       />
 
@@ -348,11 +359,6 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
               key={record.attendance_id}
               record={record}
               category={category}
-              onPress={() => {
-                if (record.session) {
-                  onViewSession(record.session);
-                }
-              }}
               onCheckInPress={() => {
                 if (record.session) {
                   onOpenCheckIn(record, "check-in");
@@ -388,9 +394,11 @@ export default function SessionsScreen() {
   // Need refresh here to update the Participate tab counts once we check in
   const { attendances: myAttendances, refresh: myAttendancesRefresh } = useMyAttendance();
 
-  // ── Screen-level modal (lifted out of ScrollView) ──────────────────────────
   const [selectedSession, setSelectedSession] = useState<BackendSession | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+
+  const { updateSessionInState } = useSession();
   
   // ── Separated CheckInModal State ─────────────────────────────────────────────
   const [checkInModalData, setCheckInModalData] = useState<SessionJoinData | null>(null);
@@ -474,6 +482,31 @@ export default function SessionsScreen() {
             type: "success",
             title: "Checked In Successfully",
             message: `At ${timeStr}, ${dateStr}\nMethod: ${method.toUpperCase()}`,
+          });
+        }}
+        onEditSession={() => {
+          setModalVisible(false);
+          setTimeout(() => setUpdateModalVisible(true), 350);
+        }}
+      />
+
+      <UpdateSessionModal
+        session={selectedSession}
+        visible={updateModalVisible}
+        onClose={() => {
+          setUpdateModalVisible(false);
+          setTimeout(() => setSelectedSession(null), 300);
+        }}
+        onUpdate={async (payload) => {
+          if (!selectedSession) return;
+          const updatedSession = await SessionService.updateSession(selectedSession.session_id, payload);
+          updateSessionInState(updatedSession);
+          setSelectedSession(updatedSession);
+          setToastConfig({
+            visible: true,
+            type: "success",
+            title: "Session Updated",
+            message: "Your changes have been saved.",
           });
         }}
       />
@@ -675,6 +708,14 @@ export default function SessionsScreen() {
             setLiveAttendanceSessionName(session.session_name || "Session");
             setLiveAttendanceVisible(true);
           }}
+          onSessionDeleted={(name) => {
+            setToastConfig({
+              visible: true,
+              type: "success",
+              title: "Session Deleted",
+              message: `"${name}" has been removed.`,
+            });
+          }}
         />
       ) : (
         <ParticipateTab
@@ -710,7 +751,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 4,
     // Subtle shadow
-    shadowColor: "#2563EB",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -729,8 +770,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   toggleBtnActive: {
-    backgroundColor: "#2563EB",
-    shadowColor: "#2563EB",
+    backgroundColor: "#001F54",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.35,
     shadowRadius: 10,

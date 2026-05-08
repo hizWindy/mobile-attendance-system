@@ -1,214 +1,180 @@
-import { Tabs } from "expo-router";
-import React, { useEffect, useRef, useContext } from "react";
-import { Animated, Platform, StyleSheet } from "react-native";
+/**
+ * app/(tabs)/_layout.tsx
+ *
+ * Drawer Navigator — replaces the 5-tab bottom bar.
+ * Uses @react-navigation/drawer (already installed) via expo-router's
+ * `<Drawer />` integration so route names stay consistent.
+ *
+ * Drawer behaviour:
+ *  • Slides in from the left with a spring animation
+ *  • Swipe gesture enabled natively (react-native-gesture-handler)
+ *  • Hamburger toggle rendered in the screen header
+ *  • Custom content component (CustomDrawerContent) handles
+ *    avatar, nav items, active highlighting, logout
+ */
 
-import { HapticTab } from "@/components/haptic-tab";
+import CustomDrawerContent from "@/components/layout/CustomDrawerContent";
 import CustomHeader from "@/components/layout/CustomHeader";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { AuthContext } from "@/context/AuthContext";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Drawer } from "expo-router/drawer";
+import React, { useContext } from "react";
+import { StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-type TabIconProps = {
-  focused: boolean;
-  color: string;
-  name: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-};
+// Active/brand colour aligned to the app's Trust Navy
+const ACTIVE_COLOR = "#001F54";
 
-function TabIcon({ focused, color, name }: TabIconProps) {
-  const dotScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  const dotOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(dotScale, {
-        toValue: focused ? 1 : 0,
-        useNativeDriver: true,
-        tension: 220,
-        friction: 10,
-      }),
-      Animated.timing(dotOpacity, {
-        toValue: focused ? 1 : 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [focused]);
-
-  return (
-    <Animated.View style={styles.iconContainer}>
-      <MaterialCommunityIcons name={name} size={24} color={color} />
-      <Animated.View
-        style={[
-          styles.dot,
-          {
-            backgroundColor: color,
-            transform: [{ scale: dotScale }],
-            opacity: dotOpacity,
-          },
-        ]}
-      />
-    </Animated.View>
-  );
-}
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+export default function DrawerLayout() {
   const { user } = useContext(AuthContext);
 
   const headerUser = {
-    name: user ? `${user.first_name} ${user.last_name}` : "Guest"
+    name: user ? `${user.first_name} ${user.last_name}` : "Guest",
+    photoURL: user
+      ? `https://api.dicebear.com/7.x/initials/png?seed=${encodeURIComponent(
+          user.full_name ?? user.username ?? "User"
+        )}&backgroundColor=1e4d7a&fontColor=ffffff`
+      : undefined,
   };
 
+  
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-        tabBarInactiveTintColor: isDark ? "#475569" : "#94a3b8",
-        headerShown: false,
-        tabBarButton: HapticTab,
+    <GestureHandlerRootView style={styles.root}>
+      <Drawer
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={({ navigation }) => ({
+          /**
+           * Drawer appearance
+           */
+          drawerType: "slide",           // Pushes screen content — feels native
+          drawerPosition: "left",
+          drawerStyle: {
+            width: 300,
+            backgroundColor: "#0A0F1E", // Matches CustomDrawerContent bg
+          },
+          overlayColor: "rgba(0,0,0,0.45)",
+          swipeEnabled: true,
+          swipeEdgeWidth: 60,            // Wide enough to swipe open from edge
+          drawerActiveTintColor: ACTIVE_COLOR,
+          drawerInactiveTintColor: "#6B7280",
 
-        // Typography
-        tabBarLabelStyle: {
-          fontFamily: "Inter_400Regular",
-          fontSize: 11,
-          fontWeight: "600",
-          marginBottom: Platform.OS === "ios" ? 0 : 4,
-        },
-
-        // Floating card-style tab bar
-        tabBarStyle: {
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderTopWidth: 0,
-          elevation: 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: isDark ? 0.3 : 0.08,
-          shadowRadius: 16,
-          height: Platform.OS === "ios" ? 88 : 68,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
-          paddingHorizontal: 8,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-        },
-
-        // Active tab indicator: pill highlight behind the icon+label
-        tabBarItemStyle: {
-          borderRadius: 14,
-          marginHorizontal: 4,
-        },
-
-        tabBarActiveBackgroundColor: isDark
-          ? "rgba(96, 165, 250, 0.12)"
-          : "rgba(0, 31, 84, 0.07)",
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          header: () => (
+          /**
+           * Shared header — shows the hamburger toggle
+           */
+          header: ({ route, options }) => (
             <CustomHeader
               user={headerUser}
               notificationCount={5}
-              onNotificationPress={() => console.log("notifications pressed")}
-            />
-          ),
-          headerShown: true,
-          title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              focused={focused}
-              color={color}
-              name={focused ? "home-account" : "home-variant-outline"}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="sessions"
-        options={{
-          header: () => (
-            <CustomHeader
-              user={headerUser}
-              notificationCount={2}
-              onNotificationPress={() => console.log("notifications pressed")}
-            />
-          ),
-          headerShown: true,
-          title: "Sessions",
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              focused={focused}
-              color={color}
-              name={focused ? "calendar-check" : "calendar-check-outline"}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="analytics"
-        options={{
-          header: () => <CustomHeader user={headerUser} />,
-          headerShown: true,
-          title: "Analytics",
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              focused={focused}
-              color={color}
-              name={
-                focused ? "chart-areaspline" : "chart-bell-curve-cumulative"
+              onNotificationPress={() =>
+                console.log("notifications pressed")
               }
+              onMenuPress={() => navigation.toggleDrawer()}
             />
           ),
-        }}
-      />
+          headerShown: true,
+        })}
+      >
+        {/* ─── Screens ─────────────────────────────────────────────────── */}
+        <Drawer.Screen
+          name="index"
+          options={{
+            drawerLabel: "Home",
+            title: "Home",
+            drawerIcon: ({ focused, color }) => (
+              <MaterialCommunityIcons
+                name={focused ? "home-account" : "home-variant-outline"}
+                size={22}
+                color={color}
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              focused={focused}
-              color={color}
-              name={focused ? "account-circle" : "account-circle-outline"}
-            />
-          ),
-        }}
-      />
+        <Drawer.Screen
+          name="sessions"
+          options={{
+            drawerLabel: "Sessions",
+            title: "Sessions",
+            drawerIcon: ({ focused, color }) => (
+              <MaterialCommunityIcons
+                name={focused ? "calendar-check" : "calendar-check-outline"}
+                size={22}
+                color={color}
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="debug"
-        options={{
-          title: "Debug",
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              focused={focused}
-              color={color}
-              name={focused ? "bug" : "bug-outline"}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+        <Drawer.Screen
+          name="activities"
+          options={{
+            drawerLabel: "Activities",
+            title: "Activities",
+            drawerIcon: ({ focused, color }) => (
+              <MaterialCommunityIcons
+                name={focused ? "clipboard-text" : "clipboard-text-outline"}
+                size={22}
+                color={color}
+              />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="analytics"
+          options={{
+            drawerLabel: "Analytics",
+            title: "Analytics",
+            drawerIcon: ({ focused, color }) => (
+              <MaterialCommunityIcons
+                name={
+                  focused
+                    ? "chart-areaspline"
+                    : "chart-bell-curve-cumulative"
+                }
+                size={22}
+                color={color}
+              />
+            ),
+          }}
+        />
+
+        {/* Profile — hidden from drawer but still navigable */}
+        <Drawer.Screen
+          name="profile"
+          options={{
+            drawerLabel: "Profile",
+            title: "Profile",
+            drawerItemStyle: { display: "none" }, // Hidden from menu
+          }}
+        />
+
+        {/* Analytics Sessions — hidden from drawer but still navigable */}
+        <Drawer.Screen
+          name="analytics-sessions"
+          options={{
+            drawerLabel: "Analytics Sessions",
+            title: "Analytics Sessions",
+            drawerItemStyle: { display: "none" }, // Hidden from menu
+          }}
+        />
+
+        {/* Debug — hidden from drawer but still navigable */}
+        <Drawer.Screen
+          name="debug"
+          options={{
+            drawerLabel: "Debug",
+            title: "Debug",
+            drawerItemStyle: { display: "none" }, // Hidden from menu
+          }}
+        />
+      </Drawer>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  iconContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 42,
-    paddingTop: 2,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 3,
+  root: {
+    flex: 1,
   },
 });

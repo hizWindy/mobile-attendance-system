@@ -1,30 +1,30 @@
 import { BackendSession } from "../types/SessionTypes";
-import api from "./AxiosInstance"; // make sure AxiosInstance handles absolute imports properly or has a .ts/.js
-
+import api from "./AxiosInstance";
+import { API_ROUTES } from "./ApiRoutes";
 
 const SessionService = {
-  
+
   // for admin used
   getList: async (): Promise<{ sessions: BackendSession[] }> => {
-    const response = await api.get("/sessions/list");
+    const response = await api.get(`${API_ROUTES.SESSIONS}/list`);
     return response.data;
   },
 
-  // for specific user 
-  getMyList : async () : Promise<{ sessions: BackendSession[] }> => {
-    const response = await api.get("/sessions/my-sessions");
+  // for specific user
+  getMyList: async (): Promise<{ sessions: BackendSession[] }> => {
+    const response = await api.get(`${API_ROUTES.SESSIONS}/my-sessions`);
     return response.data;
   },
 
   get: async (sessionId: number | string): Promise<BackendSession> => {
-    const response = await api.get(`/sessions/get/${sessionId}`);
+    const response = await api.get(`${API_ROUTES.SESSIONS}/get/${sessionId}`);
     return response.data;
   },
 
   createSession: async (
     sessionData: Partial<BackendSession>,
   ): Promise<BackendSession> => {
-    const response = await api.post("/sessions/create", sessionData);
+    const response = await api.post(`${API_ROUTES.SESSIONS}/create`, sessionData);
     return response.data;
   },
 
@@ -33,21 +33,23 @@ const SessionService = {
     sessionData: Partial<BackendSession>,
   ): Promise<BackendSession> => {
     const response = await api.put(
-      `/sessions/update/${sessionId}`,
+      `${API_ROUTES.SESSIONS}/update/${sessionId}`,
       sessionData,
     );
     return response.data;
   },
 
   deleteSession: async (sessionId: number | string): Promise<any> => {
-    const response = await api.delete(`/sessions/delete/${sessionId}`);
+    const response = await api.delete(`${API_ROUTES.SESSIONS}/delete/${sessionId}`);
     return response.data;
   },
 
-  getSessionReport : async ( sessionId : number | string ) : Promise<any> => {
-    const response = await api.get(`/sessions/report/${sessionId}`);
+  getSessionReport: async (sessionId: number | string): Promise<any> => {
+    const response = await api.get(`${API_ROUTES.SESSIONS}/report/${sessionId}`, {
+      responseType: "arraybuffer",
+    });
     return response.data;
-  }
+  },
 };
 
 export default SessionService;

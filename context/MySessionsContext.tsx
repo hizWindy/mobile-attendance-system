@@ -42,6 +42,7 @@ export interface MySessionsContextType {
     sessionData: Partial<BackendSession>,
   ) => Promise<BackendSession | null>;
   removeSession: (id: number | string) => Promise<void>;
+  updateSessionInState: (updatedSession: BackendSession) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -145,9 +146,19 @@ export const MySessionsProvider = ({
     } catch (err) {
       console.error("[MySessionsContext] removeSession error:", err);
       setError((prev) => ({ ...prev, remove: "Failed to delete session" }));
+      throw err;
     } finally {
       setLoading((prev) => ({ ...prev, remove: false }));
     }
+  }, []);
+
+  // ── Update a session directly in state ─────────────────────────────────────
+  const updateSessionInState = useCallback((updatedSession: BackendSession) => {
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.session_id === updatedSession.session_id ? updatedSession : s
+      )
+    );
   }, []);
 
   // ── Auth-aware fetch ───────────────────────────────────────────────────────
@@ -165,6 +176,7 @@ export const MySessionsProvider = ({
     getSessions,
     addSession,
     removeSession,
+    updateSessionInState,
   };
 
   return (

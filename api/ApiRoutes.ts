@@ -6,5 +6,6 @@ export const API_ROUTES = {
   SESSIONS: "/sessions",
   AUTH: "/auth",
   USERS : "/users",
+  ACTIVITIES: "/activities",
   
 } as const;

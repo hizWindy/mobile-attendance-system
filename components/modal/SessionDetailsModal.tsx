@@ -1,4 +1,5 @@
 import AnalyticsService, { SessionStats } from "@/api/AnalyticsService";
+import GeofenceMapModal from "@/components/modal/GeofenceMapModal";
 import { BackendSession } from "@/types/SessionTypes";
 import { formatTime12hr, getSessionTerm } from "@/utils/timeUtils";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -105,6 +106,8 @@ interface Props {
   isParticipant?: boolean;
   /** Called with the chosen method key when user confirms check-in */
   onCheckInWithMethod?: (method: string) => void;
+  /** Called when supervisor wants to edit session details */
+  onEditSession?: () => void;
 }
 
 export const SessionDetailsModal: React.FC<Props> = ({
@@ -116,11 +119,13 @@ export const SessionDetailsModal: React.FC<Props> = ({
   onCheckIn,
   isParticipant = false,
   onCheckInWithMethod,
+  onEditSession,
 }) => {
   const slideAnim = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const [checkingIn, setCheckingIn] = useState(false);
+  const [geofenceVisible, setGeofenceVisible] = useState(false);
 
   // ── Analytics state ──────────────────────────────────────────────────────────
   const [stats, setStats] = useState<SessionStats | null>(null);
@@ -240,6 +245,14 @@ export const SessionDetailsModal: React.FC<Props> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
+      {/* GeofenceMapModal */}
+      <GeofenceMapModal
+        visible={geofenceVisible}
+        onClose={() => setGeofenceVisible(false)}
+        sessionName={session.session_name}
+        location={session.location}
+        sessionId={session.session_id}
+      />
       {/* ── Dim overlay ── */}
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.overlay, { opacity: opacityAnim }]} />
@@ -363,6 +376,18 @@ export const SessionDetailsModal: React.FC<Props> = ({
                   label="Geofence Radius"
                   value={`${session.location.radius} meters`}
                 />
+              )}
+              {/* Geofence Map button — only when coords available */}
+              {!!(session.location?.latitude && session.location?.longitude) && (
+                <TouchableOpacity
+                  style={styles.geofenceBtn}
+                  onPress={() => setGeofenceVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="map-marker-radius" size={16} color="#3B82F6" />
+                  <Text style={styles.geofenceBtnText}>View Geofence Map</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#93C5FD" style={{ marginLeft: "auto" }} />
+                </TouchableOpacity>
               )}
             </>
           )}
@@ -524,6 +549,18 @@ export const SessionDetailsModal: React.FC<Props> = ({
               </TouchableOpacity>
             )}
 
+            {/* 👨‍🏫 SUPERVISOR Edit Session (Prominent Bottom Button) */}
+            {session.role_type?.includes("Supervisor") && onEditSession && (
+              <TouchableOpacity
+                style={[styles.btnManage, { backgroundColor: "#3B82F6", borderColor: "#2563EB", borderWidth: 1, marginTop: 12 }]}
+                onPress={onEditSession}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="create" size={18} color="#FFFFFF" />
+                <Text style={[styles.btnManageText, { color: "#FFFFFF" }]}>Update / Edit Session</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.btnClose} onPress={onClose} activeOpacity={0.7}>
               <Text style={styles.btnCloseText}>Dismiss</Text>
             </TouchableOpacity>
@@ -611,6 +648,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     flexShrink: 0,
+    alignItems: "center",
+  },
+  btnHeaderUpdate: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  btnHeaderUpdateText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    color: "#FFFFFF",
+    textTransform: "uppercase",
   },
   chip: {
     borderWidth: 1,
@@ -730,6 +788,26 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#475569",
     letterSpacing: 0.5,
+  },
+
+  // Geofence button
+  geofenceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  geofenceBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1D4ED8",
+    flex: 1,
   },
 
   // Notes

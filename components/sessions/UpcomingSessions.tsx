@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
 import React from "react";
-import { TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, useColorScheme, View } from "react-native";
 import { Session, SessionItem } from "./SessionItem";
 
 interface UpcomingSessionsProps {
@@ -14,6 +14,8 @@ export const UpcomingSessions: React.FC<UpcomingSessionsProps> = ({
   onSessionPress,
   onSeeAllPress,
 }) => {
+  const isDark = useColorScheme() === "dark";
+
   return (
     <View className="mt-5 w-full">
       <View className="flex-row justify-between items-center mb-3 px-1">
@@ -21,15 +23,15 @@ export const UpcomingSessions: React.FC<UpcomingSessionsProps> = ({
           Upcoming Sessions
         </ThemedText>
         <TouchableOpacity onPress={onSeeAllPress}>
-          <ThemedText className="text-sm font-semibold text-blue-500">
-            See all
-          </ThemedText>
+          <Text style={[styles.viewAll, isDark && styles.viewAllDark]}>
+            View All →
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View className="bg-white dark:bg-slate-800 rounded-2xl px-4 py-2 mb-2">
         {sessions.length > 0 ? (
-          sessions.map((session, index) => (
+          sessions.map((session) => (
             <SessionItem
               key={session.id}
               session={session}
@@ -45,3 +47,14 @@ export const UpcomingSessions: React.FC<UpcomingSessionsProps> = ({
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  viewAll: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  viewAllDark: {
+    color: "#FFFFFF",
+  },
+});

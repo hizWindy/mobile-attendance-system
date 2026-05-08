@@ -1,3 +1,5 @@
+import type { ActivityItem } from "@/api/ActivityService";
+import ActivityService from "@/api/ActivityService";
 import AttendanceService, { SessionJoinData } from "@/api/AttendanceService";
 import { Activity } from "@/components/activity/ActivityItem";
 import { RecentActivity } from "@/components/activity/RecentActivity";
@@ -6,56 +8,24 @@ import { SupervisorCreateSessionButton } from "@/components/button/SupervisorCre
 import { ActivityModal } from "@/components/modal/ActivityModal";
 import { CheckInModal } from "@/components/modal/CheckInModal";
 import { CreateSessionModal } from "@/components/modal/CreateSessionModal";
-import { useDiscoverSessions } from "@/context/DiscoverSessionsContext";
-import { formatTime12hr } from "@/utils/timeUtils";
-import { BackendSession } from "@/types/SessionTypes";
+import { LocationMapModal } from "@/components/modal/LocationMapModal";
 import { SearchSessions } from "@/components/search/SearchSessions";
 import { Session } from "@/components/sessions/SessionItem";
 import { UpcomingSessions } from "@/components/sessions/UpcomingSessions";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { ThemedText } from "@/components/themed-text";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { useSession } from "@/hooks/useSession";
-import { useMyAttendance } from "@/hooks/useMyAttendance";
-import { isUpcoming } from "@/hooks/useSessionStatus";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
-import { Alert, Animated, ScrollView, Text, View } from "react-native";
 import { LocationContext } from "@/context/LocationContext";
+import { useMyAttendance } from "@/hooks/useMyAttendance";
+import { useSession } from "@/hooks/useSession";
+import { isUpcoming } from "@/hooks/useSessionStatus";
+import { BackendSession } from "@/types/SessionTypes";
+import { formatTime12hr } from "@/utils/timeUtils";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Animated, ScrollView, Text, View, Linking, TouchableOpacity, Platform } from "react-native";
 
-// Sample data - Replace with actual data from API/state management
-const SAMPLE_SESSIONS: Session[] = [
-  {
-    id: "1",
-    date: "OCT 12",
-    name: "Project Sync: Delta",
-    time: "9:30 AM - 11:30 AM",
-    status: "CONFIRMED",
-  },
-  {
-    id: "2",
-    date: "OCT 14",
-    name: "Weekly Tech Review",
-    time: "2:00 PM - 2:30 PM",
-    status: "PENDING",
-  },
-];
-
-const SAMPLE_ACTIVITIES: Activity[] = [
-  {
-    id: "1",
-    type: "attendance",
-    title: "Attended Dev Workshop",
-    timestamp: "Yesterday at 2:30 PM",
-  },
-  {
-    id: "2",
-    type: "management",
-    title: "Managed 'Product Launch'",
-    timestamp: "2 days ago",
-  },
-];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -64,8 +34,8 @@ export default function HomeScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [checkInModalVisible, setCheckInModalVisible] = useState(false);
-  const [createSessionModalVisible, setCreateSessionModalVisible] =
-    useState(false);
+  const [createSessionModalVisible, setCreateSessionModalVisible] = useState(false);
+  const [mapModalVisible, setMapModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"attendee" | "supervisor">(
     "attendee",
   );
@@ -74,9 +44,8 @@ export default function HomeScreen() {
   const { categorized: myAttendances, refresh: myAttendancesRefresh } = useMyAttendance();
 
 
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
-    null,
-  );
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [activityModalVisible, setActivityModalVisible] = useState(false);
   // join response from the backend; drives the CheckInModal
   const [joinedSessionData, setJoinedSessionData] = useState<SessionJoinData | null>(null);
@@ -92,8 +61,31 @@ export default function HomeScreen() {
     title: "",
   });
 
-  const [recentActivities, setRecentActivities] =
-    useState<Activity[]>(SAMPLE_ACTIVITIES);
+  const fetchActivities = useCallback(() => {
+    ActivityService.getMyActivities(20, 0)
+      .then((res) => {
+        const raw = res as any;
+        const list: ActivityItem[] =
+          raw.activities       ??
+          raw.data?.items      ??
+          raw.data?.activities ??
+          raw.items            ??
+          [];
+        setActivities(list);
+      })
+      .catch((e) => {
+        console.error("[Home] activities fetch error:", e?.message ?? e);
+      });
+  }, []);
+
+  // ── Poll recent activities every 30s while tab is focused ────────────
+  useFocusEffect(
+    useCallback(() => {
+      fetchActivities();
+      const intervalId = setInterval(fetchActivities, 30_000);
+      return () => clearInterval(intervalId);
+    }, [fetchActivities])
+  );
 
   // Formatter mapping a BackendSession to the UI `Session` item shape
   const mapSessionToUI = (s: BackendSession, defaultStatus: "MANAGING" | "ATTENDING" = "ATTENDING"): Session => {
@@ -147,6 +139,16 @@ export default function HomeScreen() {
   const [searchError, setSearchError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(150)).current;
+
+  // Auto-dismiss search errors (like "You have already joined this session") after 3 seconds
+  useEffect(() => {
+    if (searchError) {
+      const timer = setTimeout(() => {
+        setSearchError("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchError]);
 
   // Elegantly slide toast up from the bottom, hovering like a pill
   useEffect(() => {
@@ -218,6 +220,7 @@ export default function HomeScreen() {
       setToastMessage(result.message);
       setJoinedSessionData({ ...result.data, session_code: trimmedQuery });
       setCheckInModalVisible(true);
+      fetchActivities(); // Refresh activities after join
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       setSearchError(detail || "Unable to join session. Please try again.");
@@ -236,14 +239,13 @@ export default function HomeScreen() {
       
       const newSession = await addSession(payload);
       if (newSession) {
-        setSearchQuery(newSession.session_code);
         setToastMessage(`Session created! Code: ${newSession.session_code}`);
+        fetchActivities(); // Refresh activities after create
       } else {
         Alert.alert("Data Error", "Failed to create session on the backend. Please try again.");
       }
     } else {
       // Fallback if no payload is provided
-      setSearchQuery(sessionCode);
       setToastMessage(`Mock session created: ${sessionCode}`);
     }
   };
@@ -261,7 +263,7 @@ export default function HomeScreen() {
   };
 
   const handleViewAllActivities = () => {
-    console.log("View all activities pressed");
+    router.push("/activities");
   };
 
   return (
@@ -302,66 +304,60 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Current Location (Compact, implicit) ── */}
-        <View style={{
-          width: "100%",
-          maxWidth: 384,
-          marginBottom: 14,
-          backgroundColor: locationError ? "#FFF1F2" : "#F8FAFC",
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: locationError ? "#FECDD3" : "#E2E8F0",
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-        }}>
-          <View style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            backgroundColor: locationError ? "#FEE2E2" : "#EFF6FF",
-            alignItems: "center",
-            justifyContent: "center",
-          }}>
+        <TouchableOpacity 
+          activeOpacity={0.7}
+          onPress={() => {
+            if (location && !locationError && !locationLoading) {
+              setMapModalVisible(true);
+            }
+          }}
+          className={`w-full max-w-sm mb-4 rounded-xl border flex-row items-center px-4 py-3 gap-3 ${
+          locationError 
+            ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50" 
+            : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+        }`}>
+          <View className={`w-8 h-8 rounded-lg items-center justify-center ${
+            locationError ? "bg-red-100 dark:bg-red-900/40" : "bg-blue-50 dark:bg-blue-900/30"
+          }`}>
             <Ionicons
               name={locationError ? "warning-outline" : "location"}
-              size={15}
+              size={16}
               color={locationError ? "#EF4444" : "#3B82F6"}
             />
           </View>
 
           <View style={{ flex: 1 }}>
             {locationLoading ? (
-              <Text style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic" }}>
+              <Text className="text-sm italic text-slate-500 dark:text-slate-400">
                 Acquiring GPS signal...
               </Text>
             ) : locationError ? (
-              <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "500" }}>
+              <Text className="text-sm font-medium text-red-500 dark:text-red-400">
                 Unable to retrieve location
               </Text>
             ) : (
               <>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>
+                <Text className="text-[14px] font-bold text-slate-900 dark:text-white leading-tight" numberOfLines={1}>
                   {address || (location
                     ? `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`
                     : "Location unavailable")}
                 </Text>
-                <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>
-                  Used for attendance integrity
+                <Text className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                  Tap to view on Map
                 </Text>
               </>
             )}
           </View>
 
-          {/* Live status dot */}
-          <View style={{
-            width: 7,
-            height: 7,
-            borderRadius: 4,
-            backgroundColor: locationLoading ? "#F59E0B" : locationError ? "#EF4444" : "#22C55E",
-          }} />
-        </View>
+          {/* Live status dot / Map Chevron */}
+          {location && !locationError && !locationLoading ? (
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          ) : (
+            <View className={`w-2 h-2 rounded-full ${
+              locationLoading ? "bg-amber-500" : locationError ? "bg-red-500" : "bg-emerald-500"
+            }`} />
+          )}
+        </TouchableOpacity>
 
         <View className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm elevation-3 mb-6">
           <ThemedText className="text-xl font-extrabold text-[#1f4d7a] dark:text-blue-100 mb-3">
@@ -406,8 +402,7 @@ export default function HomeScreen() {
           />
 
           <RecentActivity
-            activities={recentActivities}
-            onActivityPress={handleActivityPress}
+            activities={activities}
             onViewAllPress={handleViewAllActivities}
           />
         </View>
@@ -431,6 +426,7 @@ export default function HomeScreen() {
               metadata: { status: "Scanned via QR" },
             });
             await myAttendancesRefresh();
+            fetchActivities(); // Refresh activities after QR scan log
             const now = new Date();
             const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
             const ts = result?.time_stats;
@@ -555,6 +551,15 @@ export default function HomeScreen() {
         visible={activityModalVisible}
         activity={selectedActivity}
         onClose={() => setActivityModalVisible(false)}
+      />
+
+      <LocationMapModal
+        visible={mapModalVisible}
+        onClose={() => setMapModalVisible(false)}
+        latitude={location?.coords.latitude || 0}
+        longitude={location?.coords.longitude || 0}
+        title={address || "Current Location"}
+        description="Your exact GPS coordinates"
       />
     </View>
   );

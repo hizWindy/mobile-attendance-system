@@ -11,8 +11,8 @@ export type ScheduleType =
   | "one-time"
   | "daily"
   | "weekly"
-  | "every_n_days"
-  | "semestral"
+  | "monthly"
+  | "term"
   | "custom";
 
 export interface SessionLocation {

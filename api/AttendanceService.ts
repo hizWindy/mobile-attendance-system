@@ -1,5 +1,6 @@
 // /api/AttendanceService.ts
 import { AttendanceRecord } from "../types/AttendanceTypes";
+import { API_ROUTES } from "./ApiRoutes";
 import api from "./AxiosInstance";
 
 export interface LogAttendancePayload {
@@ -46,6 +47,24 @@ export interface SessionJoinResponse {
   data: SessionJoinData;
 }
 
+export interface LocationData {
+  latitude: number | null;
+  longitude: number | null;
+  action_type: string;
+  log_time: string | null;
+}
+
+export interface AttendeeLocation {
+  attendance_id: number;
+  full_name: string;
+  checkin: LocationData | null;
+  checkout: LocationData | null;
+}
+
+export interface SessionLocationResponse {
+  success: boolean;
+  data: AttendeeLocation[];
+}
 const AttendanceService = {
   /**
    * Fetches all attendance records for the currently authenticated user.
@@ -53,7 +72,7 @@ const AttendanceService = {
    * Route: GET /attendances/my-attendances
    */
   getMyAttendances: async (): Promise<{ attendances: AttendanceRecord[] }> => {
-    const response = await api.get("/attendances/my-attendances");
+    const response = await api.get(`${API_ROUTES.ATTENDANCE}/my-attendances`);
     return response.data;
   },
 
@@ -63,7 +82,7 @@ const AttendanceService = {
    * Route: POST /attendances/join
    */
   registerAttendance: async (session_code: string): Promise<SessionJoinResponse> => {
-    const response = await api.post("/attendances/join", { session_code });
+    const response = await api.post(`${API_ROUTES.ATTENDANCE}/join`, { session_code });
     return response.data;
   },
 
@@ -73,7 +92,7 @@ const AttendanceService = {
    */
   logAttendance: async (payload: LogAttendancePayload): Promise<AttendanceActionResponse> => {
     console.log("\n[AttendanceService] Sending logAttendance Payload to Backend:", JSON.stringify(payload, null, 2), "\n");
-    const response = await api.post("/attendances/log", payload);
+    const response = await api.post(`${API_ROUTES.ATTENDANCE}/log`, payload);
     return response.data;
   },
 
@@ -91,7 +110,7 @@ const AttendanceService = {
    * Route: GET /attendances/session-logs/{session_id}
    */
   getAttendanceLogs: async (session_id: number): Promise<any> => {
-    const response = await api.get(`/attendances/session-logs/${session_id}`);
+    const response = await api.get(`${API_ROUTES.ATTENDANCE}/session-logs/${session_id}`);
     return response.data;
   },
 
@@ -101,11 +120,17 @@ const AttendanceService = {
    * Route: GET /attendances/report/{session_id}
    */
   getAttendanceReport: async (session_id: number): Promise<ArrayBuffer> => {
-    const response = await api.get(`/attendances/report/${session_id}`, {
+    const response = await api.get(`${API_ROUTES.ATTENDANCE}/report/${session_id}`, {
       responseType: "arraybuffer",
     });
     return response.data;
   },
+
+  getSessionAttendeeLocations: async (session_id: number): Promise<SessionLocationResponse> => {
+  const response = await api.get(`${API_ROUTES.ATTENDANCE}/log-location/${session_id}`);
+  return response.data;
+}
+  
 };
 
 export default AttendanceService;

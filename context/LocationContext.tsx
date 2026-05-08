@@ -30,9 +30,9 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Fetch high accuracy GPS location
+      // Fetch GPS location with balanced accuracy to prevent hanging on Android
       const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
       setLocation(loc);
 
@@ -44,10 +44,17 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
 
       if (geocode && geocode.length > 0) {
         const place = geocode[0];
-        // formatting: "123 Main St, City, Country"
-        const formattedAddress = [place.street, place.city, place.country]
+        
+        // Prioritize street name, otherwise use the specific place name
+        const street = place.street || place.name;
+        // Prioritize neighborhood/district, then city
+        const area = place.district || place.subregion || place.city;
+        const region = place.region; // e.g. state or province
+
+        const formattedAddress = [street, area, region]
           .filter(Boolean)
           .join(", ");
+          
         setAddress(formattedAddress || "Unknown location");
       }
     } catch (error) {

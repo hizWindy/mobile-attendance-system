@@ -1,8 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import React, { useContext, useMemo } from "react";
 import {
-  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,29 +8,31 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
+import { AuthContext } from "@/context/AuthContext";
+import { MyAttendanceContext } from "@/context/MyAttendanceContext";
 
 const COLORS = {
   primary: "#1e4d7a",
   bg: "#FFFFFF",
   muted: "#94A3B8",
   text: "#0F172A",
-  danger: "#EF4444",
   border: "#F1F5F9",
 };
 
-import { AuthContext } from "@/context/AuthContext";
-import { MyAttendanceContext } from "@/context/MyAttendanceContext";
-
 export default function ProfileScreen() {
-  const router = useRouter();
-  const { user: authUser, logout } = useContext(AuthContext);
+  const { user: authUser } = useContext(AuthContext);
   const attendanceCtx = useContext(MyAttendanceContext);
-  
+
   const user = {
     name: authUser?.full_name || "Guest User",
     email: authUser?.email || "No Email",
-    initials: authUser?.full_name?.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "GU",
+    initials:
+      authUser?.full_name
+        ?.split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase() || "GU",
   };
 
   // ── Compute real metrics from attendance records ──────────────────────────
@@ -42,15 +42,18 @@ export default function ProfileScreen() {
     if (total === 0) return { sessions: 0, rate: "—", onTime: "—" };
 
     const attended = records.filter((r) =>
-      ["present", "on-time", "late", "completed", "incomplete"].includes(r.status)
+      ["present", "on-time", "late", "completed", "incomplete"].includes(
+        r.status
+      )
     ).length;
 
-    const onTimeCount = records.filter((r) =>
-      r.arrival_status === "on_time" || r.status === "on-time"
+    const onTimeCount = records.filter(
+      (r) => r.arrival_status === "on_time" || r.status === "on-time"
     ).length;
 
     const rate = Math.round((attended / total) * 100);
-    const onTimeRate = attended > 0 ? Math.round((onTimeCount / attended) * 100) : 0;
+    const onTimeRate =
+      attended > 0 ? Math.round((onTimeCount / attended) * 100) : 0;
 
     return {
       sessions: total,
@@ -59,143 +62,127 @@ export default function ProfileScreen() {
     };
   }, [attendanceCtx?.attendances]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to log out? This will flush all session tokens.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Logout", 
-          style: "destructive", 
-          onPress: async () => {
-            await logout();
-            // Redirection happens automatically in _layout.tsx
-          } 
-        }
-      ]
-    );
-  };
-
-
-  const ProfileMetric = ({ label, value }: { label: string; value: string }) => (
+  const ProfileMetric = ({
+    label,
+    value,
+  }: {
+    label: string;
+    value: string;
+  }) => (
     <View style={styles.metricItem}>
-       <Text style={styles.metricVal}>{value}</Text>
-       <Text style={styles.metricLab}>{label}</Text>
+      <Text style={styles.metricVal}>{value}</Text>
+      <Text style={styles.metricLab}>{label}</Text>
     </View>
   );
 
-  const ListItem = ({ 
-    icon, 
-    label, 
-    sub = "", 
-    variant = "default", 
-    isLast = false, 
-    onPress 
-  }: { 
-    icon: any; 
-    label: string; 
-    sub?: string; 
-    variant?: "default" | "danger"; 
-    isLast?: boolean; 
+  const ListItem = ({
+    icon,
+    label,
+    sub = "",
+    isLast = false,
+    onPress,
+  }: {
+    icon: any;
+    label: string;
+    sub?: string;
+    isLast?: boolean;
     onPress: () => void;
   }) => (
-    <TouchableOpacity 
-      style={[styles.listItem, isLast && { borderBottomWidth: 0 }]} 
+    <TouchableOpacity
+      style={[styles.listItem, isLast && { borderBottomWidth: 0 }]}
       onPress={onPress}
       activeOpacity={0.6}
     >
-       <View style={styles.listIconWrap}>
-          <MaterialCommunityIcons 
-             name={icon} 
-             size={20} 
-             color={variant === "danger" ? COLORS.danger : COLORS.primary} 
-          />
-       </View>
-       <View style={styles.listTextWrap}>
-          <Text style={[styles.listLabel, variant === "danger" && { color: COLORS.danger, fontWeight: "800" }]}>{label}</Text>
-          {sub ? <Text style={styles.listSub}>{sub}</Text> : null}
-       </View>
-       <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+      <View style={styles.listIconWrap}>
+        <MaterialCommunityIcons
+          name={icon}
+          size={20}
+          color={COLORS.primary}
+        />
+      </View>
+      <View style={styles.listTextWrap}>
+        <Text style={styles.listLabel}>{label}</Text>
+        {sub ? <Text style={styles.listSub}>{sub}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 🌟 Minimal Header - Fixed size */}
         <View style={styles.header}>
-           <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user.initials}</Text>
-           </View>
-           <Text style={styles.userName}>{user.name}</Text>
-           <Text style={styles.userEmail}>{user.email}</Text>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{user.initials}</Text>
+          </View>
+          <Text style={styles.userName}>{user.name}</Text>
+          <Text style={styles.userEmail}>{user.email}</Text>
         </View>
 
         {/* 📊 Simple Metrics Bar */}
         <View style={styles.metricsBar}>
-           <ProfileMetric label="Attend Rate" value={metrics.rate} />
-           <View style={styles.hDivider} />
-           <ProfileMetric label="Sessions" value={String(metrics.sessions)} />
-           <View style={styles.hDivider} />
-           <ProfileMetric label="On-Time" value={metrics.onTime} />
+          <ProfileMetric label="Attend Rate" value={metrics.rate} />
+          <View style={styles.hDivider} />
+          <ProfileMetric
+            label="Sessions"
+            value={String(metrics.sessions)}
+          />
+          <View style={styles.hDivider} />
+          <ProfileMetric label="On-Time" value={metrics.onTime} />
         </View>
 
         {/* ⚙ Settings List */}
         <View style={styles.section}>
-           <Text style={styles.sectionHeader}>WORKSPACE</Text>
-           <View style={styles.listCard}>
-              <ListItem 
-                icon="account-outline" 
-                label="Profile Information" 
-                sub="Manage your professional data"
-                onPress={() => {}}
-              />
-              <ListItem 
-                icon="shield-lock-outline" 
-                label="Login & Security" 
-                sub="Biometric access settings"
-                onPress={() => {}}
-              />
-              <ListItem 
-                icon="bell-ring-outline" 
-                label="Notifications" 
-                onPress={() => {}}
-              />
-              <ListItem 
-                icon="palette" 
-                label="Appearance" 
-                isLast
-                onPress={() => {}}
-              />
-           </View>
+          <Text style={styles.sectionHeader}>WORKSPACE</Text>
+          <View style={styles.listCard}>
+            <ListItem
+              icon="account-outline"
+              label="Profile Information"
+              sub="Manage your professional data"
+              onPress={() => {}}
+            />
+            <ListItem
+              icon="shield-lock-outline"
+              label="Login & Security"
+              sub="Biometric access settings"
+              onPress={() => {}}
+            />
+            <ListItem
+              icon="bell-ring-outline"
+              label="Notifications"
+              onPress={() => {}}
+            />
+            <ListItem
+              icon="palette"
+              label="Appearance"
+              isLast
+              onPress={() => {}}
+            />
+          </View>
         </View>
 
         <View style={styles.section}>
-           <Text style={styles.sectionHeader}>SESSION</Text>
-           <View style={styles.listCard}>
-              <ListItem 
-                icon="lifebuoy" 
-                label="Help Center" 
-                onPress={() => {}}
-              />
-              <ListItem 
-                icon="logout-variant" 
-                label="Logout" 
-                variant="danger"
-                isLast
-                onPress={handleLogout}
-              />
-           </View>
+          <Text style={styles.sectionHeader}>SUPPORT</Text>
+          <View style={styles.listCard}>
+            <ListItem
+              icon="lifebuoy"
+              label="Help Center"
+              isLast
+              onPress={() => {}}
+            />
+          </View>
         </View>
 
         <View style={styles.footer}>
-           <Text style={styles.versionInfo}>ClockWise Mobile v2.0</Text>
+          <Text style={styles.versionInfo}>ClockWise Mobile v2.0</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

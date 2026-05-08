@@ -1,9 +1,9 @@
 import { SessionJoinData } from "@/api/AttendanceService";
+import { QRScannerModal, QRScanResult } from "@/components/modal/QRScannerModal";
+import { LocationContext } from "@/context/LocationContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useContext } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View, useColorScheme, ActivityIndicator } from "react-native";
-import { LocationContext } from "@/context/LocationContext";
-import { QRScannerModal, QRScanResult } from "@/components/modal/QRScannerModal";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useColorScheme, View } from "react-native";
 
 interface CheckInModalProps {
   visible: boolean;
@@ -73,14 +73,24 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   const isActive = session.is_active;
   const cfg = STATUS_CONFIG[session.status] || STATUS_CONFIG["upcoming"];
 
+  // Maps legacy/alias keys to their canonical backend values.
+  // This ensures we always send the correct value regardless of what the backend stores.
+  const CANONICAL_KEY_MAP: Record<string, string> = {
+    "manual click": "manual",
+    "qr based":     "qr",
+    "location check": "geofencing",
+    "facial recognition": "face",
+  };
+
   // Build display list while preserving the backend key used for the API call.
-  // The map key IS the backend value ("manual", "qr", "geofencing") — never the UI label.
+  // Alias keys are normalized to their canonical backend value here.
   const allowedMethods = session.allowed_methods
     .map((m) => {
-      const key = m.toLowerCase();
-      const display = METHODS[key];
+      const rawKey = m.toLowerCase();
+      const canonicalKey = CANONICAL_KEY_MAP[rawKey] ?? rawKey;
+      const display = METHODS[canonicalKey] ?? METHODS[rawKey];
       // Resolve name dynamically based on current actionType
-      return display ? { key, name: display.name(actionType), icon: display.icon, type: display.type } : null;
+      return display ? { key: canonicalKey, name: display.name(actionType), icon: display.icon, type: display.type } : null;
     })
     .filter(Boolean) as Array<{ key: string; name: string; icon: string; type: "Ionicons" | "MaterialCommunityIcons" }>;
 
@@ -109,17 +119,53 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                 <Text style={{ fontSize: 11, fontWeight: "800", color: cfg.accentColor, textTransform: "uppercase" }}>
                   {cfg.label}
                 </Text>
-              </View>
+              </View> 
             </View>
 
             <Text style={[styles.sessionTitle, isDark && styles.sessionTitleDark]}>{session.session_name}</Text>
             
-            <View style={styles.previewInfoRow}>
-              <Ionicons name="location-outline" size={16} color={isDark ? "#94A3B8" : "#64748B"} />
-              <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark]}>
-                {session.location}
-              </Text>
-            </View>
+            {/* Location & Platform Info */}
+            {(() => {
+              // Legacy string fallback
+              if (typeof session.location === "string") {
+                return (
+                  <View style={styles.previewInfoRow}>
+                    <Ionicons name="location-outline" size={16} color={isDark ? "#94A3B8" : "#64748B"} />
+                    <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark]} numberOfLines={2}>
+                      {session.location}
+                    </Text>
+                  </View>
+                );
+              }
+
+              // Parsed JSON object handling based on session_setup
+              const loc = session.location || {};
+              const setup = (session.session_setup || "").toLowerCase().replace("-", "_");
+              const isRemote = setup === "remote" || setup === "hybrid";
+              const isOnSite = setup === "on_site" || setup === "hybrid" || setup === "onsite";
+
+              return (
+                <>
+                  {isRemote && (loc.platform || loc.link) && (
+                    <View style={styles.previewInfoRow}>
+                      <Ionicons name="laptop-outline" size={16} color={isDark ? "#94A3B8" : "#64748B"} />
+                      <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark]} numberOfLines={2}>
+                        {loc.platform ? `${loc.platform}` : "Remote"}
+                        {loc.link ? ` • ${loc.link}` : ""}
+                      </Text>
+                    </View>
+                  )}
+                  {isOnSite && (loc.address || (loc.latitude && loc.longitude)) && (
+                    <View style={styles.previewInfoRow}>
+                      <Ionicons name="location-outline" size={16} color={isDark ? "#94A3B8" : "#64748B"} />
+                      <Text style={[styles.previewInfoText, isDark && styles.previewInfoTextDark]} numberOfLines={2}>
+                        {loc.address || `Lat: ${loc.latitude}, Lon: ${loc.longitude}`}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              );
+            })()}
 
             <View style={styles.previewInfoRow}>
               <Ionicons

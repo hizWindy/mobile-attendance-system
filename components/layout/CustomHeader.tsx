@@ -1,18 +1,42 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+/**
+ * CustomHeader.tsx
+ *
+ * App-wide header for the Drawer navigator.
+ * Fixed 64dp content area · 8pt grid spacing · pure StyleSheet (no className)
+ * Safe area handled via useSafeAreaInsets for precise control.
+ *
+ * Theme: Clean white — brand navy (#001F54) as accent
+ */
+
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Image,
-  Platform,
-  StatusBar,
+  Pressable,
+  StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SafeAreaView } from "react-native-safe-area-context";
+// ── Design Tokens (8pt grid) ─────────────────────────────────────────────────
+const T = {
+  bg:            "#FFFFFF",
+  surface:       "#F1F5F9",       // Subtle chip background
+  surfacePress:  "#E2E8F0",       // Pressed state
+  border:        "#E8EDF5",       // Very light separator
+  accent:        "#001F54",       // Brand navy — avatar ring, active states
+  accentLight:   "#EEF2FF",       // Soft indigo tint for bell hover
+  textPrimary:   "#0F172A",       // Near-black for name
+  textSecondary: "#64748B",       // Slate-500 for greeting
+  iconDefault:   "#475569",       // Slate-600 for icons
+  online:        "#22C55E",
+  danger:        "#EF4444",
+};
 
+const HEADER_HEIGHT = 64;
+
+// ── Types ────────────────────────────────────────────────────────────────────
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 type User = {
@@ -24,6 +48,8 @@ type CustomHeaderProps = {
   user?: User;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  /** Called when the hamburger/menu button is pressed */
+  onMenuPress?: () => void;
 };
 
 export const DEFAULT_USER: User = {
@@ -38,80 +64,60 @@ const getGreeting = () => {
   return "Good evening";
 };
 
+// ── Component ────────────────────────────────────────────────────────────────
 const CustomHeader: React.FC<CustomHeaderProps> = ({
   user = DEFAULT_USER,
   notificationCount = 3,
   onNotificationPress,
+  onMenuPress,
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
   const [notifPressed, setNotifPressed] = useState(false);
+  const [menuPressed, setMenuPressed] = useState(false);
 
   return (
-    <SafeAreaView
-      style={{
-        backgroundColor: "#0A0F1E",
-        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-        // Bottom border glow
-        borderBottomWidth: 1,
-        borderBottomColor: "#1E2A45",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 10,
-      }}
-    >
-      <View className="flex-row items-center justify-between px-5 py-3">
+    <View style={[styles.safeWrap, { paddingTop: insets.top }]}>
+      <View style={styles.row}>
 
-        {/* Left: Avatar + Greeting + Name */}
-        <View className="flex-row items-center gap-3 flex-1">
+        {/* ── Hamburger menu ── */}
+        {onMenuPress ? (
+          <Pressable
+            onPress={onMenuPress}
+            onPressIn={() => setMenuPressed(true)}
+            onPressOut={() => setMenuPressed(false)}
+            android_ripple={{ color: "rgba(0,31,84,0.08)", radius: 22 }}
+            style={[styles.menuButton, menuPressed && styles.menuButtonPressed]}
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons
+              name="menu"
+              size={22}
+              color={menuPressed ? T.accent : T.iconDefault}
+            />
+          </Pressable>
+        ) : null}
 
+        {/* ── Avatar + Greeting + Name ── */}
+        <View style={styles.userSection}>
           {/* Avatar with online dot */}
-          <View className="relative">
+          <View style={styles.avatarWrap}>
             {user.photoURL ? (
-              <Image
-                source={{ uri: user.photoURL }}
-                className="w-11 h-11 rounded-full"
-                style={{
-                  borderWidth: 2,
-                  borderColor: "#1E3A8A",
-                }}
-              />
+              <Image source={{ uri: user.photoURL }} style={styles.avatar} />
             ) : (
-              // Fallback initials avatar
-              <View
-                className="w-11 h-11 rounded-full items-center justify-center"
-                style={{ backgroundColor: "#1E3A8A" }}
-              >
-                <Text className="text-white text-base font-bold">
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
                   {user.name?.charAt(0) ?? "U"}
                 </Text>
               </View>
             )}
-
-            {/* Online indicator dot */}
-            <View
-              className="absolute bottom-0 right-0 w-3 h-3 rounded-full"
-              style={{
-                backgroundColor: "#22C55E",
-                borderWidth: 2,
-                borderColor: "#0A0F1E",
-              }}
-            />
+            <View style={styles.onlineDot} />
           </View>
 
           {/* Greeting + Name */}
-          <View className="flex-1">
+          <View style={styles.greetingWrap}>
+            <Text style={styles.greetingText}>{getGreeting()} 👋</Text>
             <Text
-              className="text-xs font-medium"
-              style={{ color: "#6B7280" }}
-            >
-              {getGreeting()}
-            </Text>
-            <Text
-              className="text-base font-bold"
-              style={{ color: "#F9FAFB" }}
+              style={styles.nameText}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -120,50 +126,177 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
           </View>
         </View>
 
-        {/* Right: Notification Bell + Badge */}
-        <TouchableOpacity
+        {/* ── Notification Bell ── */}
+        <Pressable
           onPress={onNotificationPress}
           onPressIn={() => setNotifPressed(true)}
           onPressOut={() => setNotifPressed(false)}
-          activeOpacity={1}
-          className="relative items-center justify-center w-11 h-11 rounded-full"
-          style={{
-            backgroundColor: notifPressed ? "#1E2A45" : "#131929",
-            borderWidth: 1,
-            borderColor: "#1E2A45",
-            transform: [{ scale: notifPressed ? 0.93 : 1 }],
-          }}
+          style={[styles.bellButton, notifPressed && styles.bellButtonPressed]}
+          hitSlop={4}
         >
           <MaterialCommunityIcons
             name={"bell-outline" as IconName}
-            size={22}
-            color="#D1D5DB"
+            size={21}
+            color={notifPressed ? T.accent : T.iconDefault}
           />
 
-          {/* Notification Badge */}
+          {/* Badge */}
           {notificationCount > 0 && (
-            <View
-              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full
-                items-center justify-center px-1"
-              style={{
-                backgroundColor: "#EF4444",
-                borderWidth: 2,
-                borderColor: "#0A0F1E",
-              }}
-            >
-              <Text
-                className="text-white font-bold"
-                style={{ fontSize: 10, lineHeight: 13 }}
-              >
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
                 {notificationCount > 99 ? "99+" : notificationCount}
               </Text>
             </View>
           )}
-        </TouchableOpacity>
-
+        </Pressable>
       </View>
-    </SafeAreaView>
+
+      {/* ── Subtle brand accent strip at the bottom ── */}
+      <View style={styles.accentStrip} />
+    </View>
   );
 };
+
+// ── Styles (8pt grid) ────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  safeWrap: {
+    backgroundColor: T.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    // Soft lift shadow tinted navy
+    shadowColor: "#001F54",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  row: {
+    height: HEADER_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+
+  // ── Brand accent strip (very subtle) ──
+  accentStrip: {
+    height: 2,
+    backgroundColor: T.accent,
+    opacity: 0.12,
+  },
+
+  // ── Menu button ──
+  menuButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuButtonPressed: {
+    backgroundColor: T.surfacePress,
+    borderColor: "#C7D2E0",
+  },
+
+  // ── User section (avatar + text) ──
+  userSection: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  avatarWrap: {
+    position: "relative",
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: T.accent,
+  },
+  avatarFallback: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: T.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: T.online,
+    borderWidth: 2,
+    borderColor: T.bg,
+  },
+
+  // ── Greeting text ──
+  greetingWrap: {
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: T.textSecondary,
+    letterSpacing: 0.1,
+  },
+  nameText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: T.textPrimary,
+    marginTop: 1,
+    letterSpacing: -0.2,
+  },
+
+  // ── Notification bell ──
+  bellButton: {
+    position: "relative",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  bellButtonPressed: {
+    backgroundColor: T.accentLight,
+    borderColor: "#C7D2FF",
+  },
+  badge: {
+    position: "absolute",
+    top: -1,
+    right: -1,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: T.danger,
+    borderWidth: 1.5,
+    borderColor: T.bg,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
+});
 
 export default CustomHeader;

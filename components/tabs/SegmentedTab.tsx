@@ -27,7 +27,7 @@ interface SegmentedTabProps {
   onChange: (key: string) => void;
   /**
    * Accent colour for the active chip.
-   * Defaults to the app's "Trust Blue" #2563EB.
+   * Defaults to the app's Navy Blue #001F54.
    */
   accentColor?: string;
 }
@@ -36,7 +36,7 @@ export const SegmentedTab: React.FC<SegmentedTabProps> = ({
   options,
   activeKey,
   onChange,
-  accentColor = "#2563EB",
+  accentColor = "#001F54",
 }) => {
   const scrollRef = useRef<ScrollView>(null);
   const isDark = useColorScheme() === "dark";
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     // backgroundColor and borderColor set inline with accentColor
-    shadowColor: "#2563EB",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

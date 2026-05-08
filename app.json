@@ -72,7 +72,8 @@
           "cameraPermission": "Allow ClockWise to access your camera to scan QR codes for attendance."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

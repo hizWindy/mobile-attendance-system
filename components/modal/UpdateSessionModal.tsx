@@ -21,7 +21,7 @@ import {
   useColorScheme
 } from "react-native";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ATTENDANCE_METHODS = [
   {
     id: "manual",
@@ -62,11 +62,11 @@ const SCHEDULE_TYPES: {
 const WEEK_POSITIONS = ["1st", "2nd", "3rd", "4th", "5th", "last"];
 
 const TERM_OPTIONS = [
-  { label: '4 wks — Short Intensive',        weeks: 4  },
-  { label: '8 wks — Short Course / Quarter', weeks: 8  },
-  { label: '12 wks — Trimester',             weeks: 12 },
-  { label: '16 wks — Semester',              weeks: 16 },
-  { label: '18 wks — Extended Semester',     weeks: 18 },
+  { label: '4 wks â€” Short Intensive',        weeks: 4  },
+  { label: '8 wks â€” Short Course / Quarter', weeks: 8  },
+  { label: '12 wks â€” Trimester',             weeks: 12 },
+  { label: '16 wks â€” Semester',              weeks: 16 },
+  { label: '18 wks â€” Extended Semester',     weeks: 18 },
   { label: 'Custom',                         weeks: 0  },
 ];
 
@@ -81,8 +81,8 @@ const WEEKDAYS = [
 ];
 const WEEKDAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SectionHeader = ({
   icon,
   title,
@@ -101,7 +101,7 @@ const SectionHeader = ({
   </View>
 );
 
-/** A compact +/− stepper for numeric inputs. */
+/** A compact +/âˆ’ stepper for numeric inputs. */
 const Stepper = ({
   value,
   onChange,
@@ -137,7 +137,7 @@ const Stepper = ({
   </View>
 );
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const VALID_SCHEDULE_TYPES: ScheduleType[] = [
   "one-time",
   "daily",
@@ -321,23 +321,25 @@ function validateSessionForm(data: {
   return { valid: true };
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-interface CreateSessionModalProps {
+// â”€â”€â”€ Props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+interface UpdateSessionModalProps {
+  session: import('@/types/SessionTypes').BackendSession | null;
   visible: boolean;
   onClose: () => void;
-  onCreate: (sessionCode: string, payload?: any) => void;
+  onUpdate: (updatedData: Partial<import('@/types/SessionTypes').BackendSession>) => Promise<void>;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
+  session,
   visible,
   onClose,
-  onCreate,
+  onUpdate,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
-  // ── Form state ─────────────────────────────────────────────────────────────
+  // â”€â”€ Form state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [sessionName, setSessionName] = useState("");
   const [scheduleType, setScheduleType] = useState<ScheduleType>("one-time");
 
@@ -451,7 +453,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     setRemoteLink("");
   }, []);
 
-  // ── sanitizeNumber: silently clamp numeric inputs while typing ──────────────────
+  // â”€â”€ sanitizeNumber: silently clamp numeric inputs while typing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sanitizeNumber = (val: string, min: number, max: number): string => {
     const stripped = val.replace(/^0+(?=\d)/, "").replace(/[^0-9]/g, "");
     if (!stripped) return "";
@@ -476,7 +478,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       const refresh = parseInt(qrRefreshIntervalSecs, 10);
       const window = parseInt(qrWindowSecs, 10);
       if (refresh >= window) {
-        setQrIntervalError(`❌ Refresh interval must be less than the scan window (${window}s).`);
+        setQrIntervalError(`âŒ Refresh interval must be less than the scan window (${window}s).`);
       } else {
         setQrIntervalError(null);
       }
@@ -485,7 +487,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     }
   }, [qrRefreshIntervalSecs, qrWindowSecs]);
 
-  // ── Smart Frequency Assessment ───────────────────────────────────────────
+  // â”€â”€ Smart Frequency Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     setSmartWarning(null);
     setSmartSuggestion(null);
@@ -544,7 +546,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       }
 
       if (previewDates.length === 3) {
-        setScheduleInfo(`Monthly · Next 3 dates: ${previewDates.map(d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}`);
+        setScheduleInfo(`Monthly Â· Next 3 dates: ${previewDates.map(d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}`);
       }
     } else if (scheduleType === "term") {
       const weeks = termDuration === 0 ? parseInt(termDurationCustom || '0', 10) : termDuration;
@@ -553,7 +555,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       if (daysOfWeek.length === 7) {
         warn = 'For 7-day sessions use Daily instead.';
       } else if (weeks === 4 && daysOfWeek.length > 0 && daysOfWeek.length < 3) {
-        warn = 'A 4-week term with 2 days/week produces only 8 occurrences — below the minimum of 10. Add at least 1 more day per week or increase the term duration.';
+        warn = 'A 4-week term with 2 days/week produces only 8 occurrences â€” below the minimum of 10. Add at least 1 more day per week or increase the term duration.';
       } else if (weeks > 0 && weeks < 8) {
         warn = 'Terms under 8 weeks are considered short intensives. Consider using Weekly for shorter programs.';
       }
@@ -575,9 +577,9 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           setEndDate(endStr);
           
           const occ = countOccurrences(startDate, endStr, daysOfWeek);
-          const label = `${weeks}-week term · Ends ${computedEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ~${occ} occurrences`;
+          const label = `${weeks}-week term Â· Ends ${computedEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} Â· ~${occ} occurrences`;
           if (occ < 10) {
-            setScheduleWarn(`${label} — minimum 10 required`);
+            setScheduleWarn(`${label} â€” minimum 10 required`);
           } else {
             setScheduleInfo(label);
           }
@@ -650,12 +652,12 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     }
   }, [gracePeriodMinutes, absentLimitMinutes, startTime, endTime]);
 
-  // ── Soft real-time warnings (amber only — no red borders) ──────────────────
+  // â”€â”€ Soft real-time warnings (amber only â€” no red borders) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // These guide the user but never block typing or show red.
   // Grace-period vs duration is already handled by graceWarning above.
   // Days < 3 for weekly is a soft amber warning shown inline in JSX.
 
-  // ── Validation toast animation ─────────────────────────────────────────
+  // â”€â”€ Validation toast animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (validationToast) {
       Animated.sequence([
@@ -666,7 +668,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     }
   }, [validationToast]);
 
-  // ── Location search (Photon API) ───────────────────────────────────────────
+  // â”€â”€ Location search (Photon API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (locationQuery.length < 3) {
       setLocationResults([]);
@@ -706,7 +708,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     return () => clearTimeout(timer);
   }, [locationQuery, location]);
 
-  // ── Filter methods when switching to Remote ────────────────────────────────
+  // â”€â”€ Filter methods when switching to Remote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (sessionType === "Remote") {
       setSelectedMethods((prev) =>
@@ -718,7 +720,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     }
   }, [sessionType]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const toggleMethod = (methodId: string) => {
     const config = ATTENDANCE_METHODS.find((m) => m.id === methodId);
     if (sessionType === "Remote" && !config?.remote) return;
@@ -822,7 +824,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           setEndDate(dateStr);
         } else if (endDate && dateStr > endDate) {
           setEndDate("");
-          setSmartWarning("End date was reset — please reselect.");
+          setSmartWarning("End date was reset â€” please reselect.");
         }
       } else if (datePickerMode === "end") {
         setEndDate(dateStr);
@@ -850,7 +852,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             const e = parseTimeObj(endTime)!;
             if (s.getTime() + 15 * 60000 > e.getTime()) {
                 setEndTime("");
-                setSmartWarning("End time was reset — please reselect.");
+                setSmartWarning("End time was reset â€” please reselect.");
             }
         }
       }
@@ -860,8 +862,8 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     }
   };
 
-  // ── Generate / submit ─────────────────────────────────────────────────────────────
-  const handleGenerate = () => {
+  // â”€â”€ Generate / submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleUpdate = () => {
     // Build submit-time errors (only shown at this point, not while typing)
     const submitErrors: Record<string, string> = {};
 
@@ -877,7 +879,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       submitErrors.endTime = "End time must be after start time";
     }
 
-    // ── Dates & schedule-type specific rules ─────────────────────────────────
+    // â”€â”€ Dates & schedule-type specific rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const todayStr = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
     
     if (scheduleType === "one-time") {
@@ -900,18 +902,18 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           submitErrors.endDate = "End date must be after start date";
         }
 
-        // ── Daily ──────────────────────────────────────────────────────────
+        // â”€â”€ Daily â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (scheduleType === "daily") {
           const diff = Math.ceil((new Date(endDate + "T00:00:00").getTime() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
           if (diff < 2) submitErrors.endDate = "Daily schedule needs at least 3 days total. Extend the end date.";
         }
 
-        // ── Weekly ─────────────────────────────────────────────────────────
+        // â”€â”€ Weekly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (scheduleType === "weekly") {
           if (daysOfWeek.length === 0) {
             submitErrors.daysOfWeek = "Select at least one day of the week.";
           } else if (daysOfWeek.length === 7) {
-            submitErrors.daysOfWeek = "All 7 days selected — use Daily instead.";
+            submitErrors.daysOfWeek = "All 7 days selected â€” use Daily instead.";
           } else {
             const diff = Math.ceil((new Date(endDate + "T00:00:00").getTime() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
             if (diff < 6) submitErrors.endDate = "Date range must span at least 1 week.";
@@ -921,7 +923,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           }
         }
 
-        // ── Monthly ────────────────────────────────────────────────────────
+        // â”€â”€ Monthly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (scheduleType === "monthly") {
           const diff = Math.ceil((new Date(endDate + "T00:00:00").getTime() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
           if (diff < 28) {
@@ -936,13 +938,13 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           }
         }
 
-        // ── Term ───────────────────────────────────────────────────────────
+        // â”€â”€ Term â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (scheduleType === "term") {
           // Days selection
           if (daysOfWeek.length < 2) {
             submitErrors.daysOfWeek = "Select at least 2 days per week for a term.";
           } else if (daysOfWeek.length === 7) {
-            submitErrors.daysOfWeek = "All 7 days selected — use Daily instead.";
+            submitErrors.daysOfWeek = "All 7 days selected â€” use Daily instead.";
           }
 
           // Duration
@@ -961,7 +963,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             }
           }
 
-          // Occurrence minimum (≥ 10)
+          // Occurrence minimum (â‰¥ 10)
           if (!submitErrors.termDuration && !submitErrors.daysOfWeek && !submitErrors.startDate) {
             const occ = countOccurrences(startDate, endDate, daysOfWeek);
             if (occ < 10) {
@@ -974,12 +976,12 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       // Weekly still needs day selection even if dates are missing
       if (scheduleType === "weekly" && !submitErrors.daysOfWeek) {
         if (daysOfWeek.length === 0) submitErrors.daysOfWeek = "Select at least one day of the week.";
-        else if (daysOfWeek.length === 7) submitErrors.daysOfWeek = "All 7 days selected — use Daily instead.";
+        else if (daysOfWeek.length === 7) submitErrors.daysOfWeek = "All 7 days selected â€” use Daily instead.";
       }
       // Term still needs day selection even if dates are missing
       if (scheduleType === "term" && !submitErrors.daysOfWeek) {
         if (daysOfWeek.length < 2) submitErrors.daysOfWeek = "Select at least 2 days per week for a term.";
-        else if (daysOfWeek.length === 7) submitErrors.daysOfWeek = "All 7 days selected — use Daily instead.";
+        else if (daysOfWeek.length === 7) submitErrors.daysOfWeek = "All 7 days selected â€” use Daily instead.";
       }
     }
 
@@ -1099,8 +1101,8 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         : {}),
     };
 
-    const doCreate = () => {
-      onCreate(code, payload);
+    const doUpdate = () => {
+      onUpdate(payload);
       resetForm();
       onClose();
     };
@@ -1132,21 +1134,21 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         break;
     }
 
-    if (scheduleType === "daily" || scheduleType === "one-time") { doCreate(); return; }
+    if (scheduleType === "daily" || scheduleType === "one-time") { doUpdate(); return; }
 
     Alert.alert(
       "Confirm Schedule",
       `${msg}\n\nDo you want to proceed?`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Create Session", style: "default", onPress: doCreate }
+        { text: "Update Session", style: "default", onPress: doUpdate }
       ]
     );
   };
 
   if (!visible) return null;
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <View style={styles.fullscreenOverlay}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -1170,7 +1172,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Session Info ─────────────────────────────────────────────── */}
+          {/* â”€â”€ Session Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <SectionHeader
             icon="information-circle-outline"
             title="Session Info"
@@ -1225,7 +1227,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             ))}
           </View>
 
-          {/* ── Timeline ─────────────────────────────────────────────────── */}
+          {/* â”€â”€ Timeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <SectionHeader
             icon="calendar-outline"
             title="Timeline"
@@ -1255,7 +1257,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
 
               {monthlyMode === "specific_date" ? (
                 <View>
-                  <Text style={styles.label}>Day of Month (1–31)</Text>
+                  <Text style={styles.label}>Day of Month (1â€“31)</Text>
                   <TextInput
                     style={[styles.input, isDark && styles.inputDark]}
                     placeholder="15"
@@ -1359,7 +1361,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
               {termDuration === 0 && (
                 <TextInput
                   style={[styles.input, isDark && styles.inputDark, { marginTop: 12 }]}
-                  placeholder="Enter number of weeks (4–26)"
+                  placeholder="Enter number of weeks (4â€“26)"
                   keyboardType="numeric"
                   value={termDurationCustom}
                   onChangeText={setTermDurationCustom}
@@ -1486,13 +1488,13 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             const e = parseTimeObj(endTime)!;
             const diffMins = (e.getTime() - s.getTime()) / 60000;
             if (endTime <= startTime) {
-                return <Text style={{ color: "#EF4444", fontSize: 13, fontWeight: "600", marginTop: 8, paddingHorizontal: 4 }}>⚠️ End time must be after start time</Text>;
+                return <Text style={{ color: "#EF4444", fontSize: 13, fontWeight: "600", marginTop: 8, paddingHorizontal: 4 }}>âš ï¸ End time must be after start time</Text>;
             }
             const hrs = Math.floor(diffMins / 60);
             const mins = diffMins % 60;
             const hrStr = hrs > 0 ? `${hrs} hour${hrs > 1 ? 's' : ''}` : '';
             const minStr = mins > 0 ? `${mins} minute${mins > 1 ? 's' : ''}` : '';
-            return <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "600", marginTop: 8, paddingHorizontal: 4 }}>⏱ Duration: {`${hrStr} ${minStr}`.trim()}</Text>;
+            return <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "600", marginTop: 8, paddingHorizontal: 4 }}>â± Duration: {`${hrStr} ${minStr}`.trim()}</Text>;
           })()}
 
           {smartWarning && (
@@ -1547,7 +1549,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             </View>
           )}
 
-          {/* ── Attendance Settings ───────────────────────────────────── */}
+          {/* â”€â”€ Attendance Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <SectionHeader
             icon="shield-checkmark-outline"
             title="Attendance Settings"
@@ -1599,7 +1601,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             <View style={styles.gracePeriodWarningBox}>
               <Ionicons name="warning-outline" size={16} color="#D97706" style={{ marginRight: 8 }} />
               <Text style={styles.gracePeriodWarningText}>
-                ⚠️  {fieldErrors.gracePeriod}
+                âš ï¸  {fieldErrors.gracePeriod}
               </Text>
             </View>
           )}
@@ -1622,7 +1624,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             </View>
           )}
 
-          {/* ── Setup & Verification ──────────────────────────────────────── */}
+          {/* â”€â”€ Setup & Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <SectionHeader
             icon="settings-outline"
             title="Setup & Verification"
@@ -1932,7 +1934,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             </View>
           )}
 
-          {/* ── Additional Information ───────────────────────────────────── */}
+          {/* â”€â”€ Additional Information â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <View style={{ marginTop: 24 }}>
             <SectionHeader
               icon="document-text-outline"
@@ -2030,7 +2032,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const styles = StyleSheet.create({
   fullscreenOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -2562,3 +2564,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+

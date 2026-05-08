@@ -203,16 +203,22 @@ export const deriveAttendanceCategory = (
   const isCheckedOut = has_checked_out || live_state === "checked-out";
   
   if (sessionEnded || isCheckedOut) {
-     // Explicit Missed Basis: if total_time_rendered is 0 (or null/undefined)
-     if (!record.total_time_rendered || record.total_time_rendered === 0) return "missed";
+     // If they NEVER checked in, they completely missed it
+     if (!record.check_in_time) return "missed";
 
+     // If they checked in but never checked out, it's a no-checkout
+     if (record.live_state === "checked-in" && !isCheckedOut) {
+       return "no-checkout";
+     }
+
+     // If we reach here, they checked in AND checked out (or the backend explicitly marked a result)
      if (result_status === "complete") return "completed";
-     if (result_status === "no-checkout") return "no-checkout";
      if (result_status === "incomplete") return "incomplete";
+     if ((result_status as any) === "no-checkout") return "no-checkout"; // Fallback for legacy backend payload
      
      // Fallbacks if result_status not yet populated directly during transition:
      if (isCheckedOut) return "completed";
-     if (live_state === "checked-in") return "no-checkout";
+     
      return "missed";
   }
 

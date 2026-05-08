@@ -4,10 +4,10 @@ import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View, Alert } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import AnalyticsService, { SessionStats } from "@/api/AnalyticsService";
-import AttendanceService from "@/api/AttendanceService";
+import SessionService from "@/api/SessionService";
 import { QRModal } from "@/components/modal/QRModal";
 import { SessionDetailsModal } from "@/components/modal/SessionDetailsModal";
 import { BackendSession } from "@/types/SessionTypes";
@@ -22,6 +22,8 @@ interface SessionCardProps {
   onCheckIn?: () => void;
   onViewDetails?: () => void;
   onLiveAttendance?: () => void;
+  /** Called after a successful delete — parent should remove this session from its list. */
+  onDeleteSession?: (sessionId: number) => void;
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -31,33 +33,113 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
     past:     { label: "Past",     color: "#6B7280" },
 };
 
-const getScheduleSummary = (schedule: any) => {
-    if (!schedule) return "No schedule";
-    const { type, start_date, end_date, start_time, end_time, days_of_week = [], interval_days, dates = [] } = schedule;
+// ── Schedule helpers ──────────────────────────────────────────────────────
+const SHORT_DAY: Record<string, string> = {
+  monday: "Mon", tuesday: "Tue", wednesday: "Wed",
+  thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun",
+};
 
-    const formatDate = (d: string) => {
-      if (!d) return "";
-      const [year, month, day] = d.split("-");
-      return `${year}-${month}-${day}`;
-    };
-    const formatTime = (t: string) => formatTime12hr(t);
+const FMT_DATE = (d: string) => {
+  if (!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
 
-    switch (type) {
-        case "one-time":
-            return `${formatDate(start_date)}  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        case "daily":
-            return `${formatDate(start_date)} – ${formatDate(end_date)}  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        case "weekly":
-            return `Every ${(days_of_week||[]).join(", ")}  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        case "every_n_days":
-            return `Every ${interval_days} days  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        case "semestral":
-            return `${formatDate(start_date)} – ${formatDate(end_date)}  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        case "custom":
-            return `${dates.length} dates  ·  ${formatTime(start_time)} – ${formatTime(end_time)}`;
-        default:
-            return `${formatTime(start_time)} – ${formatTime(end_time)}`;
+const FMT_DATE_SHORT = (d: string) => {
+  if (!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const ORDINAL_LABEL: Record<string, string> = {
+  "1st": "1st", "2nd": "2nd", "3rd": "3rd",
+  "4th": "4th", "5th": "5th", last: "Last",
+};
+
+interface ScheduleChip {
+  icon: string;
+  typeLabel: string;         // e.g. "TERM"
+  typeColor: string;         // badge background
+  typeBg: string;
+  lines: string[];           // main info rows
+  days?: string[];           // day pills (optional)
+}
+
+const buildScheduleChip = (schedule: any): ScheduleChip | null => {
+  if (!schedule) return null;
+  const s = schedule;
+  const time = `${formatTime12hr(s.start_time)} – ${formatTime12hr(s.end_time)}`;
+
+  switch (s.type) {
+    case "one-time":
+      return {
+        icon: "calendar-outline",
+        typeLabel: "ONE-TIME",
+        typeColor: "#3B82F6", typeBg: "#EFF6FF",
+        lines: [FMT_DATE(s.start_date), time],
+      };
+    case "daily":
+      return {
+        icon: "today-outline",
+        typeLabel: "DAILY",
+        typeColor: "#8B5CF6", typeBg: "#F5F3FF",
+        lines: [`${FMT_DATE_SHORT(s.start_date)} → ${FMT_DATE_SHORT(s.end_date)}`, time],
+      };
+    case "weekly": {
+      const dow: string[] = s.days_of_week || [];
+      return {
+        icon: "calendar-clear-outline",
+        typeLabel: "WEEKLY",
+        typeColor: "#0EA5E9", typeBg: "#F0F9FF",
+        lines: [`${FMT_DATE_SHORT(s.start_date)} → ${FMT_DATE_SHORT(s.end_date)}`, time],
+        days: dow.map(d => SHORT_DAY[d] ?? d),
+      };
     }
+    case "monthly": {
+      const mode = s.month_mode;
+      let recur = "";
+      if (mode === "specific_date") {
+        recur = `Day ${s.day_of_month} of every month`;
+      } else {
+        const wn = ORDINAL_LABEL[s.week_number] ?? s.week_number;
+        const wd = SHORT_DAY[s.weekday] ?? s.weekday;
+        recur = `${wn} ${wd} of every month`;
+      }
+      return {
+        icon: "calendar-number-outline",
+        typeLabel: "MONTHLY",
+        typeColor: "#F59E0B", typeBg: "#FFFBEB",
+        lines: [recur, `${FMT_DATE_SHORT(s.start_date)} → ${FMT_DATE_SHORT(s.end_date)}`, time],
+      };
+    }
+    case "term": {
+      const days: string[] = s.days || [];
+      const dur = s.term_duration ? `${s.term_duration}-wk term` : "Term";
+      return {
+        icon: "library-outline",
+        typeLabel: "TERM",
+        typeColor: "#10B981", typeBg: "#F0FDF4",
+        lines: [`${dur}  ·  ${FMT_DATE_SHORT(s.start_date)} → ${FMT_DATE_SHORT(s.end_date)}`, time],
+        days: days.map(d => SHORT_DAY[d] ?? d),
+      };
+    }
+    case "custom": {
+      const cnt = (s.dates ?? []).length;
+      return {
+        icon: "construct-outline",
+        typeLabel: "CUSTOM",
+        typeColor: "#6B7280", typeBg: "#F8FAFC",
+        lines: [`${cnt} selected date${cnt !== 1 ? "s" : ""}`, time],
+      };
+    }
+    default:
+      return {
+        icon: "time-outline",
+        typeLabel: (s.type ?? "SCHEDULE").toUpperCase(),
+        typeColor: "#6B7280", typeBg: "#F8FAFC",
+        lines: [time],
+      };
+  }
 };
 
 const ATTENDANCE_CONFIG: Record<
@@ -84,6 +166,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   onCheckIn,
   onViewDetails,
   onLiveAttendance,
+  onDeleteSession,
 }) => {
   // Internal fallback — used when no onViewDetails prop is supplied
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -109,6 +192,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 
   const [copied, setCopied] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleCopyCode = async () => {
     if (!session.session_code) return;
@@ -121,7 +205,8 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     if (downloadingReport) return;
     setDownloadingReport(true);
     try {
-      const data = await AttendanceService.getAttendanceReport(session.session_id);
+      const data = await SessionService.getSessionReport(session.session_id);
+      
       // Convert arraybuffer to base64
       const uint8 = new Uint8Array(data);
       let binary = "";
@@ -136,7 +221,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       });
       await Sharing.shareAsync(fileUri, {
         mimeType: "application/pdf",
-        dialogTitle: "Share Attendance Report",
+        dialogTitle: "Share Session Report",
         UTI: "com.adobe.pdf",
       });
     } catch (err: any) {
@@ -155,6 +240,50 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     } else {
       setDetailsVisible(true);
     }
+  };
+
+  // ── Delete session handler ──
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Session",
+      `Are you sure you want to delete "${session.session_name}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              if (onDeleteSession) {
+                // Let the parent (usually context) handle the API call and state removal
+                await onDeleteSession(session.session_id);
+              } else {
+                // Fallback for standalone usage
+                const response = await SessionService.deleteSession(session.session_id);
+                if (response?.success === false) {
+                  Alert.alert(
+                    "Delete Failed",
+                    response?.message || "The server could not delete this session."
+                  );
+                  return;
+                }
+              }
+            } catch (err: any) {
+              console.error("[SessionCard] Delete error:", err);
+              Alert.alert(
+                "Delete Failed",
+                err?.response?.data?.message ||
+                  err?.message ||
+                  "Could not delete session. Please try again."
+              );
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Ensure we use the exact unmodified raw status from the backend
@@ -281,14 +410,75 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 
           {/* Card body */}
           <View className="p-4">
-            <Text className="text-lg font-extrabold mb-1 text-slate-900 dark:text-white leading-tight">
-              {session.session_name}
-            </Text>
+            <View className="flex-row items-start justify-between mb-1">
+              <Text className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight flex-1 mr-2" numberOfLines={2}>
+                {session.session_name}
+              </Text>
+              {/* Delete — supervisor only, beside the title */}
+              {isSupervisor && (
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  disabled={deleting}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    handleDelete();
+                  }}
+                  style={[
+                    deleteStyles.button,
+                    deleting && deleteStyles.buttonDisabled,
+                  ]}
+                >
+                  {deleting ? (
+                    <ActivityIndicator size={14} color="#EF4444" />
+                  ) : (
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {/* Date and Time Info Summary */}
-            <Text className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-3 uppercase tracking-wider">
-               {getScheduleSummary(session.schedule)}
-            </Text>
+            {/* ── Schedule Chip ── */}
+            {(() => {
+              const chip = buildScheduleChip(session.schedule);
+              if (!chip) return null;
+              return (
+                <View style={scheduleStyles.chip}>
+                  {/* Type badge */}
+                  <View style={[scheduleStyles.typeBadge, { backgroundColor: chip.typeBg }]}>
+                    <Ionicons name={chip.icon as any} size={12} color={chip.typeColor} />
+                    <Text style={[scheduleStyles.typeLabel, { color: chip.typeColor }]}>
+                      {chip.typeLabel}
+                    </Text>
+                  </View>
+
+                  {/* Info lines */}
+                  <View style={scheduleStyles.infoCol}>
+                    {chip.lines.map((line, i) => (
+                      <Text
+                        key={i}
+                        style={[
+                          i === 0 ? scheduleStyles.lineMain : scheduleStyles.lineSub,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {line}
+                      </Text>
+                    ))}
+
+                    {/* Day pills */}
+                    {chip.days && chip.days.length > 0 && (
+                      <View style={scheduleStyles.dayRow}>
+                        {chip.days.map(d => (
+                          <View key={d} style={[scheduleStyles.dayPill, { borderColor: chip.typeColor + "60", backgroundColor: chip.typeBg }]}>
+                            <Text style={[scheduleStyles.dayPillText, { color: chip.typeColor }]}>{d}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })()}
 
             {session.details?.agenda && (
               <Text
@@ -467,3 +657,84 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     </>
   );
 };
+
+// ── Delete button styles ─────────────────────────────────────────────────────
+const deleteStyles = StyleSheet.create({
+  button: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2, // align with first line of title
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+});
+
+// ── Schedule chip styles ──────────────────────────────────────────────────────
+const scheduleStyles = StyleSheet.create({
+  chip: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 1,
+    minWidth: 72,
+    justifyContent: "center",
+  },
+  typeLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  infoCol: {
+    flex: 1,
+    gap: 2,
+  },
+  lineMain: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  lineSub: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#64748B",
+  },
+  dayRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 5,
+  },
+  dayPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  dayPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+});
+
