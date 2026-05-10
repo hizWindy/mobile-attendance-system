@@ -1,80 +1,124 @@
+/**
+ * CustomDrawerContent.tsx
+ *
+ * Redesigned sidebar — modern frosted card aesthetic.
+ * ─ Staggered slide-in mount animation for nav items
+ * ─ Spring-bounce press feedback per item
+ * ─ Safe-area aware (top + bottom insets)
+ * ─ Proper dark/light theme support
+ * ─ 48dp minimum touch targets (both iOS + Android)
+ * ─ Avatar with online presence ring
+ * ─ Profile shortcut → navigates to profile screen
+ */
+
 import { AuthContext } from "@/context/AuthContext";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-    DrawerContentComponentProps,
-    DrawerContentScrollView,
+  DrawerContentComponentProps,
+  DrawerContentScrollView,
 } from "@react-navigation/drawer";
 import { usePathname, useRouter } from "expo-router";
-import React, { useContext, useRef } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import {
-    Alert,
-    Animated,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
+  Alert,
+  Animated,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Design Tokens (8-pt grid)
-// ──────────────────────────────────────────────────────────────────────────────
-const C = {
-  bg: "#0A0F1E",           // Drawer background
-  surface: "#111827",      // Header / card surface
-  surfaceAlt: "#1a2236",   // Hover surface
-  border: "#1E2A45",       // Subtle borders
-  active: "#3B82F6",       // Trust Blue — active tint
-  activePill: "rgba(59,130,246,0.13)", // Active item bg
-  textPrimary: "#F9FAFB",
-  textSecondary: "#6B7280",
-  textMuted: "#4B5563",
-  danger: "#EF4444",
-  online: "#22C55E",
+// ─────────────────────────────────────────────────────────────────────────────
+// Theme tokens
+// ─────────────────────────────────────────────────────────────────────────────
+const light = {
+  bg:             "#F8FAFC",
+  card:           "#FFFFFF",
+  cardBorder:     "#E8EDF5",
+  navHover:       "#F1F5F9",
+  activeBg:       "rgba(37,99,235,0.08)",
+  activeTint:     "#2563EB",
+  activeBar:      "#2563EB",
+  iconDefault:    "#94A3B8",
+  textPrimary:    "#0F172A",
+  textSecondary:  "#64748B",
+  textMuted:      "#94A3B8",
+  divider:        "#E8EDF5",
+  dangerBg:       "rgba(239,68,68,0.06)",
+  dangerBorder:   "rgba(239,68,68,0.15)",
+  danger:         "#EF4444",
+  online:         "#22C55E",
+  badgeBg:        "rgba(37,99,235,0.10)",
+  badgeText:      "#2563EB",
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Nav Item Config
-// ──────────────────────────────────────────────────────────────────────────────
+const dark = {
+  bg:             "#0D1117",
+  card:           "#161B22",
+  cardBorder:     "#21262D",
+  navHover:       "#1C2128",
+  activeBg:       "rgba(59,130,246,0.12)",
+  activeTint:     "#60A5FA",
+  activeBar:      "#3B82F6",
+  iconDefault:    "#4B5563",
+  textPrimary:    "#F0F6FC",
+  textSecondary:  "#8B949E",
+  textMuted:      "#484F58",
+  divider:        "#21262D",
+  dangerBg:       "rgba(239,68,68,0.08)",
+  dangerBorder:   "rgba(239,68,68,0.18)",
+  danger:         "#F87171",
+  online:         "#3FB950",
+  badgeBg:        "rgba(59,130,246,0.15)",
+  badgeText:      "#60A5FA",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nav routes config
+// ─────────────────────────────────────────────────────────────────────────────
 type NavRoute = {
-  name: string;           // expo-router path segment
+  name: string;
   label: string;
-  icon: string;           // MaterialCommunityIcons name (inactive)
-  iconActive: string;     // MaterialCommunityIcons name (active/filled)
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  iconActive: keyof typeof MaterialCommunityIcons.glyphMap;
 };
 
 const NAV_ROUTES: NavRoute[] = [
-  { name: "index",     label: "Home",       icon: "home-variant-outline",         iconActive: "home-account"          },
-  { name: "sessions",  label: "Sessions",   icon: "calendar-check-outline",       iconActive: "calendar-check"        },
-  { name: "activities",label: "Activities", icon: "clipboard-text-outline",       iconActive: "clipboard-text"        },
-  { name: "analytics", label: "Analytics",  icon: "chart-bell-curve-cumulative",  iconActive: "chart-areaspline"      },
-  // { name: "profile", label: "Profile", icon: "account-circle-outline", iconActive: "account-circle" }, // Hidden for now
+  { name: "index",      label: "Home",       icon: "home-outline",             iconActive: "home"                   },
+  { name: "sessions",   label: "Sessions",   icon: "calendar-month-outline",   iconActive: "calendar-month"         },
+  { name: "activities", label: "Activities", icon: "clipboard-list-outline",   iconActive: "clipboard-list"         },
+  { name: "analytics",  label: "Analytics",  icon: "chart-line",               iconActive: "chart-areaspline"       },
 ];
 
-// ──────────────────────────────────────────────────────────────────────────────
-// AnimatedPressable — scale feedback on press
-// ──────────────────────────────────────────────────────────────────────────────
-function AnimatedPressable({
+// ─────────────────────────────────────────────────────────────────────────────
+// Spring-press wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+function SpringPress({
   onPress,
   style,
   children,
+  disabled,
 }: {
   onPress: () => void;
   style?: any;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = () =>
+  const pressIn = () =>
     Animated.spring(scale, {
-      toValue: 0.96,
+      toValue: 0.97,
       useNativeDriver: true,
-      tension: 300,
-      friction: 10,
+      tension: 400,
+      friction: 15,
     }).start();
 
-  const handlePressOut = () =>
+  const pressOut = () =>
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
@@ -85,9 +129,10 @@ function AnimatedPressable({
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      android_ripple={{ color: "rgba(255,255,255,0.06)", borderless: false }}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      disabled={disabled}
+      android_ripple={{ color: "rgba(99,102,241,0.08)", borderless: false }}
     >
       <Animated.View style={[style, { transform: [{ scale }] }]}>
         {children}
@@ -96,431 +141,491 @@ function AnimatedPressable({
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// NavItem
-// ──────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Animated Nav Item
+// ─────────────────────────────────────────────────────────────────────────────
 function NavItem({
   route,
   isActive,
   onPress,
+  delay,
+  T,
 }: {
   route: NavRoute;
   isActive: boolean;
   onPress: () => void;
+  delay: number;
+  T: typeof light;
 }) {
-  const iconColor = isActive ? C.active : C.textSecondary;
-  const iconName = isActive ? route.iconActive : route.icon;
+  const slideX  = useRef(new Animated.Value(-24)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideX, {
+        toValue: 0,
+        duration: 320,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 280,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const iconColor = isActive ? T.activeTint : T.iconDefault;
+  const iconName  = isActive ? route.iconActive : route.icon;
 
   return (
-    <AnimatedPressable onPress={onPress} style={[
-      styles.navItem,
-      isActive && styles.navItemActive,
-    ]}>
-      {/* Active bar */}
-      {isActive && <View style={styles.activeBar} />}
+    <Animated.View style={{ transform: [{ translateX: slideX }], opacity }}>
+      <SpringPress onPress={onPress}>
+        <View
+          style={[
+            itemStyles.row,
+            isActive && { backgroundColor: T.activeBg },
+          ]}
+        >
+          {/* Active indicator pill */}
+          {isActive && (
+            <View style={[itemStyles.pill, { backgroundColor: T.activeBar }]} />
+          )}
 
-      {/* Icon container */}
-      <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-        <MaterialCommunityIcons
-          name={iconName as any}
-          size={22}
-          color={iconColor}
-        />
-      </View>
-
-      {/* Label */}
-      <Text
-        style={[
-          styles.navLabel,
-          isActive ? styles.navLabelActive : styles.navLabelInactive,
-        ]}
-        numberOfLines={1}
-      >
-        {route.label}
-      </Text>
-    </AnimatedPressable>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// DrawerHeader — User info panel
-// ──────────────────────────────────────────────────────────────────────────────
-function DrawerHeader({ user }: { user: any }) {
-  const initials = user?.full_name
-    ?.split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) ?? "U";
-
-  const displayName = user?.full_name ?? user?.username ?? "Guest";
-  const email = user?.email ?? "";
-  const avatarUrl = `https://api.dicebear.com/7.x/initials/png?seed=${encodeURIComponent(displayName)}&backgroundColor=1e4d7a&fontColor=ffffff`;
-
-  return (
-    <View style={styles.header}>
-      {/* App brand mark */}
-      <View style={styles.brandRow}>
-        <View style={styles.brandIcon}>
-          <MaterialCommunityIcons name="clock-time-four" size={18} color={C.active} />
-        </View>
-        <Text style={styles.brandName}>ClockWise</Text>
-      </View>
-
-      {/* Divider */}
-      <View style={styles.headerDivider} />
-
-      {/* Avatar + name */}
-      <View style={styles.userRow}>
-        <View style={styles.avatarWrap}>
-          <Image
-            source={{ uri: avatarUrl }}
-            style={styles.avatar}
-            defaultSource={require("../../assets/images/icon.png")}
-          />
-          <View style={styles.onlineDot} />
-        </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName} numberOfLines={1}>{displayName}</Text>
-          {email ? (
-            <Text style={styles.userEmail} numberOfLines={1}>{email}</Text>
-          ) : null}
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {user?.role ?? "Member"}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ──────────────────────────────────────────────────────────────────────────────
-export default function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const { user, logout } = useContext(AuthContext);
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const pathname = usePathname();
-
-  // Resolve active route from pathname
-  const getActiveRoute = (): string => {
-    if (pathname === "/" || pathname === "/(tabs)" || pathname === "/(tabs)/index") return "index";
-    const segments = pathname.split("/").filter(Boolean);
-    // Strip the (tabs) group segment
-    const last = segments[segments.length - 1];
-    return last === "(tabs)" ? "index" : (last ?? "index");
-  };
-
-  const activeRoute = getActiveRoute();
-
-  const handleNavPress = (routeName: string) => {
-    // Close drawer first, then navigate
-    props.navigation.closeDrawer();
-    if (routeName === "index") {
-      router.push("/(tabs)");
-    } else {
-      router.push(`/(tabs)/${routeName}` as any);
-    }
-  };
-
-  const handleLogout = () => {
-    props.navigation.closeDrawer();
-    setTimeout(() => {
-      Alert.alert(
-        "Logout",
-        "Are you sure you want to log out? This will flush all session tokens.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Logout",
-            style: "destructive",
-            onPress: async () => {
-              await logout();
-            },
-          },
-        ]
-      );
-    }, 300); // Let drawer close before alert shows
-  };
-
-  return (
-    <View style={[styles.container, { paddingTop: insets.top > 0 ? 0 : 0 }]}>
-      {/* ── Scrollable area: Header + Nav ── */}
-      <DrawerContentScrollView
-        {...props}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
-      >
-        {/* User header */}
-        <DrawerHeader user={user} />
-
-        {/* Section label */}
-        <View style={styles.sectionLabelWrap}>
-          <Text style={styles.sectionLabel}>NAVIGATION</Text>
-        </View>
-
-        {/* Nav Items */}
-        <View style={styles.navList}>
-          {NAV_ROUTES.map((route) => (
-            <NavItem
-              key={route.name}
-              route={route}
-              isActive={activeRoute === route.name}
-              onPress={() => handleNavPress(route.name)}
+          {/* Icon */}
+          <View
+            style={[
+              itemStyles.iconBox,
+              {
+                backgroundColor: isActive
+                  ? T.activeBg
+                  : "transparent",
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={iconName as any}
+              size={21}
+              color={iconColor}
             />
-          ))}
-        </View>
-      </DrawerContentScrollView>
-
-      {/* ── Bottom pinned: Logout + Version ── */}
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: Math.max(insets.bottom, 16) },
-        ]}
-      >
-        <View style={styles.footerDivider} />
-
-        {/* Logout button */}
-        <AnimatedPressable onPress={handleLogout} style={styles.logoutButton}>
-          <View style={styles.logoutIconWrap}>
-            <MaterialCommunityIcons name="logout-variant" size={20} color={C.danger} />
           </View>
-          <Text style={styles.logoutLabel}>Logout</Text>
-        </AnimatedPressable>
 
-        {/* App version */}
-        <Text style={styles.versionText}>ClockWise Mobile v2.0</Text>
-      </View>
-    </View>
+          {/* Label */}
+          <Text
+            style={[
+              itemStyles.label,
+              {
+                color: isActive ? T.activeTint : T.textSecondary,
+                fontWeight: isActive ? "700" : "500",
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {route.label}
+          </Text>
+
+          {/* Active chevron */}
+          {isActive && (
+            <Ionicons
+              name="chevron-forward"
+              size={15}
+              color={T.activeTint}
+              style={{ opacity: 0.6 }}
+            />
+          )}
+        </View>
+      </SpringPress>
+    </Animated.View>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Styles (8pt grid)
-// ──────────────────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-
-  // ── Header ──────────────────────────────────────────────────────────────────
-  header: {
-    backgroundColor: C.surface,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  brandRow: {
+const itemStyles = StyleSheet.create({
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    gap: 8,
+    minHeight: 52,
+    borderRadius: 14,
+    marginHorizontal: 10,
+    marginVertical: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    gap: 12,
+    position: "relative",
+    overflow: "hidden",
   },
-  brandIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: "rgba(59,130,246,0.12)",
+  pill: {
+    position: "absolute",
+    left: 0,
+    top: 12,
+    bottom: 12,
+    width: 3,
+    borderRadius: 3,
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+  },
+  label: {
+    flex: 1,
+    fontSize: 15,
+    letterSpacing: -0.1,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile header card
+// ─────────────────────────────────────────────────────────────────────────────
+function ProfileCard({
+  user,
+  onPress,
+  T,
+}: {
+  user: any;
+  onPress: () => void;
+  T: typeof light;
+}) {
+  const displayName = user?.full_name ?? user?.username ?? "User";
+  const email       = user?.email ?? "";
+  const role        = user?.role ?? "Member";
+  const avatarUrl   = `https://api.dicebear.com/7.x/initials/png?seed=${encodeURIComponent(displayName)}&backgroundColor=1e4d7a&fontColor=ffffff`;
+
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(-8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeIn, { toValue: 1, duration: 380, useNativeDriver: true }),
+      Animated.spring(slideY,  { toValue: 0, tension: 200, friction: 20, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideY }] }}>
+      <SpringPress onPress={onPress}>
+        <View style={[pcStyles.card, { backgroundColor: T.card, borderColor: T.cardBorder }]}>
+          {/* Brand row */}
+          <View style={pcStyles.brand}>
+            <View style={[pcStyles.brandIcon, { backgroundColor: T.activeBg, borderColor: T.cardBorder }]}>
+              <MaterialCommunityIcons name="clock-time-four" size={15} color={T.activeTint} />
+            </View>
+            <Text style={[pcStyles.brandName, { color: T.textPrimary }]}>ClockWise</Text>
+          </View>
+
+          <View style={[pcStyles.divider, { backgroundColor: T.divider }]} />
+
+          {/* User row */}
+          <View style={pcStyles.userRow}>
+            {/* Avatar */}
+            <View style={pcStyles.avatarWrap}>
+              <Image
+                source={{ uri: avatarUrl }}
+                style={[pcStyles.avatar, { borderColor: T.activeTint }]}
+                defaultSource={require("../../assets/images/icon.png")}
+              />
+              <View style={[pcStyles.onlineDot, { backgroundColor: T.online, borderColor: T.card }]} />
+            </View>
+
+            {/* Info */}
+            <View style={{ flex: 1 }}>
+              <Text style={[pcStyles.name, { color: T.textPrimary }]} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {!!email && (
+                <Text style={[pcStyles.email, { color: T.textSecondary }]} numberOfLines={1}>
+                  {email}
+                </Text>
+              )}
+              <View style={[pcStyles.roleBadge, { backgroundColor: T.badgeBg }]}>
+                <Text style={[pcStyles.roleText, { color: T.badgeText }]}>{role}</Text>
+              </View>
+            </View>
+
+            {/* Tap hint */}
+            <Ionicons name="chevron-forward" size={16} color={T.textMuted} />
+          </View>
+        </View>
+      </SpringPress>
+    </Animated.View>
+  );
+}
+
+const pcStyles = StyleSheet.create({
+  card: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(59,130,246,0.25)",
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  brandIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   brandName: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: C.textPrimary,
-    letterSpacing: 0.3,
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.2,
     fontFamily: "Inter_700Bold",
   },
-  headerDivider: {
+  divider: {
     height: 1,
-    backgroundColor: C.border,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   userRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  avatarWrap: {
-    position: "relative",
-  },
+  avatarWrap: { position: "relative" },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     borderWidth: 2,
-    borderColor: C.active,
   },
   onlineDot: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
+    bottom: 1,
+    right: 1,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: C.online,
     borderWidth: 2,
-    borderColor: C.surface,
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
+  name: {
     fontSize: 15,
     fontWeight: "700",
-    color: C.textPrimary,
+    letterSpacing: -0.2,
     fontFamily: "Inter_700Bold",
   },
-  userEmail: {
+  email: {
     fontSize: 11,
-    color: C.textSecondary,
-    marginTop: 1,
+    marginTop: 2,
     fontFamily: "Inter_400Regular",
   },
   roleBadge: {
-    marginTop: 5,
     alignSelf: "flex-start",
-    backgroundColor: "rgba(59,130,246,0.12)",
+    marginTop: 5,
     borderRadius: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: "rgba(59,130,246,0.2)",
   },
   roleText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: C.active,
-    letterSpacing: 0.5,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.8,
     textTransform: "uppercase",
+    fontFamily: "Inter_700Bold",
   },
+});
 
-  // ── Section Label ────────────────────────────────────────────────────────────
-  sectionLabelWrap: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 8,
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
+export default function CustomDrawerContent(props: DrawerContentComponentProps) {
+  const { user, logout } = useContext(AuthContext);
+  const router           = useRouter();
+  const insets           = useSafeAreaInsets();
+  const pathname         = usePathname();
+  const scheme           = useColorScheme();
+  const T                = scheme === "dark" ? dark : light;
+
+  // Resolve active route segment
+  const getActiveRoute = (): string => {
+    if (
+      pathname === "/" ||
+      pathname === "/(tabs)" ||
+      pathname === "/(tabs)/index"
+    )
+      return "index";
+    const segments = pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    return last === "(tabs)" ? "index" : (last ?? "index");
+  };
+
+  const activeRoute = getActiveRoute();
+
+  const handleNav = (name: string) => {
+    props.navigation.closeDrawer();
+    if (name === "index") {
+      router.push("/(tabs)");
+    } else {
+      router.push(`/(tabs)/${name}` as any);
+    }
+  };
+
+  const handleProfile = () => {
+    props.navigation.closeDrawer();
+    router.push("/(tabs)/profile");
+  };
+
+  const handleLogout = () => {
+    props.navigation.closeDrawer();
+    setTimeout(() => {
+      Alert.alert(
+        "Sign Out",
+        "Are you sure you want to sign out?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Sign Out",
+            style: "destructive",
+            onPress: async () => await logout(),
+          },
+        ]
+      );
+    }, 280);
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: T.bg, paddingTop: insets.top }]}>
+      {/* ── Scrollable: profile card + nav ── */}
+      <DrawerContentScrollView
+        {...props}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      >
+        {/* Profile card */}
+        <ProfileCard user={user} onPress={handleProfile} T={T} />
+
+        {/* Section heading */}
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionLabel, { color: T.textMuted }]}>MENU</Text>
+        </View>
+
+        {/* Nav items */}
+        <View style={{ paddingBottom: 8 }}>
+          {NAV_ROUTES.map((route, i) => (
+            <NavItem
+              key={route.name}
+              route={route}
+              isActive={activeRoute === route.name}
+              onPress={() => handleNav(route.name)}
+              delay={60 + i * 55}
+              T={T}
+            />
+          ))}
+        </View>
+      </DrawerContentScrollView>
+
+      {/* ── Bottom-pinned footer ── */}
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, 20),
+            borderTopColor: T.divider,
+          },
+        ]}
+      >
+        {/* Logout */}
+        <SpringPress onPress={handleLogout}>
+          <View
+            style={[
+              styles.logoutRow,
+              {
+                backgroundColor: T.dangerBg,
+                borderColor: T.dangerBorder,
+              },
+            ]}
+          >
+            <View style={[styles.logoutIcon, { backgroundColor: "rgba(239,68,68,0.10)" }]}>
+              <Ionicons name="log-out-outline" size={20} color={T.danger} />
+            </View>
+            <Text style={[styles.logoutText, { color: T.danger }]}>Sign Out</Text>
+          </View>
+        </SpringPress>
+
+        {/* App version */}
+        <Text style={[styles.version, { color: T.textMuted }]}>ClockWise · v2.0</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shell styles
+// ─────────────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  sectionHead: {
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 6,
   },
   sectionLabel: {
     fontSize: 10,
     fontWeight: "800",
-    color: C.textMuted,
-    letterSpacing: 1.5,
+    letterSpacing: 1.6,
     textTransform: "uppercase",
     fontFamily: "Inter_700Bold",
   },
-
-  // ── Nav List ─────────────────────────────────────────────────────────────────
-  navList: {
-    paddingHorizontal: 12,
-    gap: 2,
-  },
-  navItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 52,         // >= 48dp Android / 44pt iOS
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    gap: 12,
-    position: "relative",
-    overflow: "hidden",
-  },
-  navItemActive: {
-    backgroundColor: C.activePill,
-  },
-  activeBar: {
-    position: "absolute",
-    left: 0,
-    top: 10,
-    bottom: 10,
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: C.active,
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconWrapActive: {
-    backgroundColor: "rgba(59,130,246,0.15)",
-  },
-  navLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
-  navLabelActive: {
-    fontWeight: "700",
-    color: C.textPrimary,
-    fontFamily: "Inter_700Bold",
-  },
-  navLabelInactive: {
-    fontWeight: "500",
-    color: C.textSecondary,
-    fontFamily: "Inter_400Regular",
-  },
-
-  // ── Footer ───────────────────────────────────────────────────────────────────
   footer: {
     paddingHorizontal: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  footerDivider: {
-    height: 1,
-    backgroundColor: C.border,
-    marginBottom: 12,
-    marginHorizontal: 8,
-  },
-  logoutButton: {
+  logoutRow: {
     flexDirection: "row",
     alignItems: "center",
     minHeight: 52,
     borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingVertical: 2,
     gap: 12,
-    backgroundColor: "rgba(239,68,68,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.12)",
+    marginBottom: 2,
   },
-  logoutIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "rgba(239,68,68,0.10)",
+  logoutIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
-  logoutLabel: {
+  logoutText: {
     flex: 1,
     fontSize: 15,
     fontWeight: "700",
-    color: C.danger,
     fontFamily: "Inter_700Bold",
   },
-  versionText: {
+  version: {
     textAlign: "center",
     fontSize: 10,
-    fontWeight: "800",
-    color: C.textMuted,
-    letterSpacing: 1,
-    marginTop: 12,
-    marginBottom: 4,
+    fontWeight: "600",
+    letterSpacing: 0.8,
+    marginTop: 10,
+    marginBottom: 2,
   },
 });

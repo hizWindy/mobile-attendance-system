@@ -1,123 +1,195 @@
 /**
  * CustomHeader.tsx
  *
- * App-wide header for the Drawer navigator.
- * Fixed 64dp content area · 8pt grid spacing · pure StyleSheet (no className)
- * Safe area handled via useSafeAreaInsets for precise control.
- *
- * Theme: Clean white — brand navy (#001F54) as accent
+ * Redesigned app-wide header for the Drawer navigator.
+ * ─ Adapts to light / dark color scheme
+ * ─ Spring-feedback on every interactive element
+ * ─ Safe-area aware via useSafeAreaInsets
+ * ─ 44pt / 48dp minimum touch targets
+ * ─ Subtle elevation + brand accent underline
+ * ─ Greeting changes by time of day
  */
 
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useRef, useState } from "react";
 import {
+  Animated,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Design Tokens (8pt grid) ─────────────────────────────────────────────────
-const T = {
-  bg:            "#FFFFFF",
-  surface:       "#F1F5F9",       // Subtle chip background
-  surfacePress:  "#E2E8F0",       // Pressed state
-  border:        "#E8EDF5",       // Very light separator
-  accent:        "#001F54",       // Brand navy — avatar ring, active states
-  accentLight:   "#EEF2FF",       // Soft indigo tint for bell hover
-  textPrimary:   "#0F172A",       // Near-black for name
-  textSecondary: "#64748B",       // Slate-500 for greeting
-  iconDefault:   "#475569",       // Slate-600 for icons
-  online:        "#22C55E",
-  danger:        "#EF4444",
+// ─────────────────────────────────────────────────────────────────────────────
+// Theme tokens
+// ─────────────────────────────────────────────────────────────────────────────
+const light = {
+  bg:           "#FFFFFF",
+  surface:      "#F1F5F9",
+  surfacePress: "#E2E8F0",
+  border:       "#E8EDF5",
+  accent:       "#2563EB",
+  accentLight:  "#EFF6FF",
+  textPrimary:  "#0F172A",
+  textSecondary:"#64748B",
+  icon:         "#64748B",
+  iconPress:    "#2563EB",
+  danger:       "#EF4444",
+  online:       "#22C55E",
 };
 
-const HEADER_HEIGHT = 64;
-
-// ── Types ────────────────────────────────────────────────────────────────────
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-
-type User = {
-  name?: string;
-  photoURL?: string;
+const dark = {
+  bg:           "#0D1117",
+  surface:      "#161B22",
+  surfacePress: "#1C2128",
+  border:       "#21262D",
+  accent:       "#60A5FA",
+  accentLight:  "rgba(59,130,246,0.12)",
+  textPrimary:  "#F0F6FC",
+  textSecondary:"#8B949E",
+  icon:         "#6B7280",
+  iconPress:    "#60A5FA",
+  danger:       "#F87171",
+  online:       "#3FB950",
 };
+
+const HEADER_CONTENT_HEIGHT = 56;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spring icon button
+// ─────────────────────────────────────────────────────────────────────────────
+function IconButton({
+  onPress,
+  children,
+  style,
+}: {
+  onPress?: () => void;
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () =>
+    Animated.spring(scale, { toValue: 0.90, useNativeDriver: true, tension: 400, friction: 14 }).start();
+  const pressOut = () =>
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      android_ripple={{ color: "rgba(99,102,241,0.1)", borderless: true, radius: 22 }}
+      hitSlop={8}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+type User = { name?: string; photoURL?: string };
 
 type CustomHeaderProps = {
   user?: User;
   notificationCount?: number;
   onNotificationPress?: () => void;
-  /** Called when the hamburger/menu button is pressed */
   onMenuPress?: () => void;
 };
 
 export const DEFAULT_USER: User = {
-  name: "Al-khair Pama",
-  photoURL: "https://api.dicebear.com/7.x/adventurer/png?seed=alkhair",
+  name: "User",
+  photoURL: undefined,
 };
 
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-};
-
-// ── Component ────────────────────────────────────────────────────────────────
 const CustomHeader: React.FC<CustomHeaderProps> = ({
   user = DEFAULT_USER,
-  notificationCount = 3,
+  notificationCount = 0,
   onNotificationPress,
   onMenuPress,
 }) => {
   const insets = useSafeAreaInsets();
-  const [notifPressed, setNotifPressed] = useState(false);
-  const [menuPressed, setMenuPressed] = useState(false);
+  const scheme = useColorScheme();
+  const T = scheme === "dark" ? dark : light;
 
   return (
-    <View style={[styles.safeWrap, { paddingTop: insets.top }]}>
-      <View style={styles.row}>
+    <View
+      style={[
+        styles.safeWrap,
+        {
+          paddingTop: insets.top,
+          backgroundColor: T.bg,
+          borderBottomColor: T.border,
+          ...Platform.select({
+            ios: {
+              shadowColor: scheme === "dark" ? "#000" : "#001F54",
+              shadowOpacity: scheme === "dark" ? 0.3 : 0.06,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 3 },
+            },
+            android: { elevation: scheme === "dark" ? 6 : 3 },
+          }),
+        },
+      ]}
+    >
+      <View style={[styles.row, { height: HEADER_CONTENT_HEIGHT }]}>
 
         {/* ── Hamburger menu ── */}
-        {onMenuPress ? (
-          <Pressable
+        {onMenuPress && (
+          <IconButton
             onPress={onMenuPress}
-            onPressIn={() => setMenuPressed(true)}
-            onPressOut={() => setMenuPressed(false)}
-            android_ripple={{ color: "rgba(0,31,84,0.08)", radius: 22 }}
-            style={[styles.menuButton, menuPressed && styles.menuButtonPressed]}
-            hitSlop={8}
+            style={[styles.menuButton, { backgroundColor: T.surface, borderColor: T.border }]}
           >
-            <MaterialCommunityIcons
-              name="menu"
-              size={22}
-              color={menuPressed ? T.accent : T.iconDefault}
-            />
-          </Pressable>
-        ) : null}
+            <MaterialCommunityIcons name="menu" size={22} color={T.icon} />
+          </IconButton>
+        )}
 
-        {/* ── Avatar + Greeting + Name ── */}
+        {/* ── Avatar + Greeting ── */}
         <View style={styles.userSection}>
-          {/* Avatar with online dot */}
+          {/* Avatar */}
           <View style={styles.avatarWrap}>
             {user.photoURL ? (
-              <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+              <Image
+                source={{ uri: user.photoURL }}
+                style={[styles.avatar, { borderColor: T.accent }]}
+              />
             ) : (
-              <View style={styles.avatarFallback}>
+              <View style={[styles.avatarFallback, { backgroundColor: T.accent }]}>
                 <Text style={styles.avatarInitial}>
-                  {user.name?.charAt(0) ?? "U"}
+                  {user.name?.charAt(0)?.toUpperCase() ?? "U"}
                 </Text>
               </View>
             )}
-            <View style={styles.onlineDot} />
+            <View
+              style={[styles.onlineDot, { backgroundColor: T.online, borderColor: T.bg }]}
+            />
           </View>
 
-          {/* Greeting + Name */}
+          {/* Greeting text */}
           <View style={styles.greetingWrap}>
-            <Text style={styles.greetingText}>{getGreeting()} 👋</Text>
+            <Text style={[styles.greeting, { color: T.textSecondary }]}>
+              {getGreeting()} 👋
+            </Text>
             <Text
-              style={styles.nameText}
+              style={[styles.name, { color: T.textPrimary }]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -126,21 +198,16 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
           </View>
         </View>
 
-        {/* ── Notification Bell ── */}
-        <Pressable
+        {/* ── Notification bell ── */}
+        <IconButton
           onPress={onNotificationPress}
-          onPressIn={() => setNotifPressed(true)}
-          onPressOut={() => setNotifPressed(false)}
-          style={[styles.bellButton, notifPressed && styles.bellButtonPressed]}
-          hitSlop={4}
+          style={[styles.bellButton, { backgroundColor: T.surface, borderColor: T.border }]}
         >
-          <MaterialCommunityIcons
-            name={"bell-outline" as IconName}
-            size={21}
-            color={notifPressed ? T.accent : T.iconDefault}
+          <Ionicons
+            name={notificationCount > 0 ? "notifications" : "notifications-outline"}
+            size={20}
+            color={notificationCount > 0 ? T.accent : T.icon}
           />
-
-          {/* Badge */}
           {notificationCount > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -148,154 +215,130 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
               </Text>
             </View>
           )}
-        </Pressable>
+        </IconButton>
       </View>
 
-      {/* ── Subtle brand accent strip at the bottom ── */}
-      <View style={styles.accentStrip} />
+      {/* Brand accent underline */}
+      <View
+        style={[
+          styles.accentStrip,
+          { backgroundColor: T.accent, opacity: scheme === "dark" ? 0.3 : 0.12 },
+        ]}
+      />
     </View>
   );
 };
 
-// ── Styles (8pt grid) ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeWrap: {
-    backgroundColor: T.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: T.border,
-    // Soft lift shadow tinted navy
-    shadowColor: "#001F54",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   row: {
-    height: HEADER_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 14,
+    gap: 10,
   },
 
-  // ── Brand accent strip (very subtle) ──
-  accentStrip: {
-    height: 2,
-    backgroundColor: T.accent,
-    opacity: 0.12,
-  },
-
-  // ── Menu button ──
+  // Menu button
   menuButton: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: T.surface,
     borderWidth: 1,
-    borderColor: T.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  menuButtonPressed: {
-    backgroundColor: T.surfacePress,
-    borderColor: "#C7D2E0",
-  },
 
-  // ── User section (avatar + text) ──
+  // User section
   userSection: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  avatarWrap: {
-    position: "relative",
-  },
+  avatarWrap: { position: "relative" },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 2,
-    borderColor: T.accent,
   },
   avatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: T.accent,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarInitial: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
+    fontFamily: "Inter_700Bold",
   },
   onlineDot: {
     position: "absolute",
-    bottom: 1,
-    right: 1,
+    bottom: 0,
+    right: 0,
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: T.online,
     borderWidth: 2,
-    borderColor: T.bg,
   },
-
-  // ── Greeting text ──
-  greetingWrap: {
-    flex: 1,
-  },
-  greetingText: {
+  greetingWrap: { flex: 1 },
+  greeting: {
     fontSize: 11,
     fontWeight: "500",
-    color: T.textSecondary,
     letterSpacing: 0.1,
+    fontFamily: "Inter_400Regular",
   },
-  nameText: {
+  name: {
     fontSize: 15,
     fontWeight: "700",
-    color: T.textPrimary,
     marginTop: 1,
     letterSpacing: -0.2,
+    fontFamily: "Inter_700Bold",
   },
 
-  // ── Notification bell ──
+  // Bell
   bellButton: {
     position: "relative",
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
-  },
-  bellButtonPressed: {
-    backgroundColor: T.accentLight,
-    borderColor: "#C7D2FF",
   },
   badge: {
     position: "absolute",
-    top: -1,
-    right: -1,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    backgroundColor: T.danger,
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
     borderWidth: 1.5,
-    borderColor: T.bg,
+    borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 3,
   },
   badgeText: {
     color: "#FFFFFF",
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "800",
-    lineHeight: 12,
+    lineHeight: 11,
+    fontFamily: "Inter_700Bold",
+  },
+
+  // Accent strip
+  accentStrip: {
+    height: 2,
   },
 });
 

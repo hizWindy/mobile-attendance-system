@@ -3,6 +3,9 @@ import { AttendanceRecord } from "../types/AttendanceTypes";
 import { API_ROUTES } from "./ApiRoutes";
 import api from "./AxiosInstance";
 
+// Re-exported from SessionService — single source of truth for join types
+export type { SessionJoinData, SessionJoinResponse } from "./SessionService";
+
 export interface LogAttendancePayload {
   session_id: number;
   action_type: "check-in" | "check-out";
@@ -28,23 +31,6 @@ export interface AttendanceActionResponse {
   arrival_status: string;
   result_status: string;
   time_stats: TimeStats;
-}
-
-/** Returned by POST /attendances/join */
-export interface SessionJoinData {
-  session_id: number;
-  attendance_id: number;
-  session_name: string;
-  location: string;
-  is_active: boolean;
-  allowed_methods: string[];
-  status: string;
-}
-
-export interface SessionJoinResponse {
-  success: boolean;
-  message: string;
-  data: SessionJoinData;
 }
 
 export interface LocationData {
@@ -73,16 +59,6 @@ const AttendanceService = {
    */
   getMyAttendances: async (): Promise<{ attendances: AttendanceRecord[] }> => {
     const response = await api.get(`${API_ROUTES.ATTENDANCE}/my-attendances`);
-    return response.data;
-  },
-
-  /**
-   * Registers the current user as a participant in a session via session code.
-   * This is NOT a check-in — it just creates an attendance record.
-   * Route: POST /attendances/join
-   */
-  registerAttendance: async (session_code: string): Promise<SessionJoinResponse> => {
-    const response = await api.post(`${API_ROUTES.ATTENDANCE}/join`, { session_code });
     return response.data;
   },
 
