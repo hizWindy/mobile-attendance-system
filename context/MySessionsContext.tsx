@@ -36,8 +36,11 @@ export interface MySessionsContextType {
   sessions: BackendSession[];
   loading: LoadingState;
   error: ErrorState;
+  hasMore: boolean;
+  page: number;
   /** Manually trigger a session list refresh (e.g. pull-to-refresh). */
-  getSessions: () => Promise<void>;
+  getSessions: (reset?: boolean, silent?: boolean) => Promise<void>;
+  loadMore: () => Promise<void>;
   addSession: (
     sessionData: Partial<BackendSession>,
   ) => Promise<BackendSession | null>;
@@ -57,6 +60,10 @@ export const MySessionsProvider = ({
 }) => {
   const { token } = useContext(AuthContext);
   const [sessions, setSessions] = useState<BackendSession[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  
+  // Use a ref for page so getSessions reference doesn't change on every page load
+  const pageRef = React.useRef(1);
 
   const [loading, setLoading] = useState<LoadingState>({
     list: false,
@@ -71,11 +78,12 @@ export const MySessionsProvider = ({
   });
 
   // ── Fetch my sessions ──────────────────────────────────────────────────────
-  const getSessions = useCallback(async () => {
-    setLoading((prev) => ({ ...prev, list: true }));
-    setError((prev) => ({ ...prev, list: null }));
+  const getSessions = useCallback(async (reset = true, silent = false) => {
+    if (!silent) setLoading((prev) => ({ ...prev, list: true }));
+    if (!silent) setError((prev) => ({ ...prev, list: null }));
     try {
-      const response = await SessionService.getMyList();
+      const targetPage = reset ? 1 : pageRef.current + 1;
+      const response = await SessionService.getMyList(targetPage, 15);
       
       let fetched: BackendSession[] = [];
       const resAny = response as any;
@@ -90,7 +98,6 @@ export const MySessionsProvider = ({
         } else if (Array.isArray(resAny.data?.data)) {
           fetched = resAny.data.data;
         } else if (typeof resAny.data === 'object') {
-          // Flatten objects if somehow it's dict-mapped
           const vals = Object.values(resAny.data);
           if (vals.length > 0 && typeof vals[0] === 'object') {
             fetched = vals as BackendSession[];
@@ -102,19 +109,33 @@ export const MySessionsProvider = ({
 
       console.log(`[MySessionsContext] Parsed ${fetched?.length || 0} sessions.`);
       setSessions((prev) => {
-        const newData = fetched || [];
-        if (JSON.stringify(prev) !== JSON.stringify(newData)) {
-          return newData;
+        const newData = reset ? fetched : [...prev, ...fetched];
+        // Deduplicate just in case
+        const unique = Array.from(new Map(newData.map(item => [item.session_id, item])).values());
+        
+        // Update hasMore based on the total items
+        const total = resAny?.total || 0;
+        if (total > 0) {
+          setHasMore(unique.length < total);
+        } else {
+          setHasMore(fetched.length === 15);
         }
-        return prev;
+        
+        return unique;
       });
+      pageRef.current = targetPage;
     } catch (err) {
       console.error("[MySessionsContext] getSessions error:", err);
-      setError((prev) => ({ ...prev, list: "Failed to load sessions" }));
+      if (!silent) setError((prev) => ({ ...prev, list: "Failed to load sessions" }));
     } finally {
-      setLoading((prev) => ({ ...prev, list: false }));
+      if (!silent) setLoading((prev) => ({ ...prev, list: false }));
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loading.list) return;
+    await getSessions(false);
+  }, [hasMore, loading.list, getSessions]);
 
   // ── Add a session ──────────────────────────────────────────────────────────
   const addSession = useCallback(
@@ -123,7 +144,7 @@ export const MySessionsProvider = ({
       setError((prev) => ({ ...prev, add: null }));
       try {
         const newSession = await SessionService.createSession(sessionData);
-        setSessions((prev) => [...prev, newSession]);
+        setSessions((prev) => [newSession, ...prev]);
         return newSession;
       } catch (err) {
         console.error("[MySessionsContext] addSession error:", err);
@@ -164,7 +185,7 @@ export const MySessionsProvider = ({
   // ── Auth-aware fetch ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return; // skip if no token
-    getSessions(); // load immediately when token arrives
+    getSessions(true); // load immediately when token arrives
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -173,7 +194,10 @@ export const MySessionsProvider = ({
     sessions,
     loading,
     error,
+    hasMore,
+    page: pageRef.current,
     getSessions,
+    loadMore,
     addSession,
     removeSession,
     updateSessionInState,

@@ -30,8 +30,12 @@ const SessionService = {
   },
 
   // for specific user
-  getMyList: async (): Promise<{ sessions: BackendSession[] }> => {
-    const response = await api.get(`${API_ROUTES.SESSIONS}/my-sessions`);
+  getMyList: async (page = 1, limit = 15): Promise<{ success: boolean; data: BackendSession[]; total: number; page: number; limit: number }> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    const response = await api.get(`${API_ROUTES.SESSIONS}/my-sessions?${params.toString()}`);
     return response.data;
   },
 

@@ -15,6 +15,8 @@ import {
     Alert,
     RefreshControl,
     ScrollView,
+    FlatList,
+    TextInput,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -29,6 +31,7 @@ import { CheckInModal } from "@/components/modal/CheckInModal";
 import { LiveAttendanceModal } from "@/components/modal/LiveAttendanceModal";
 import { SessionDetailsModal } from "@/components/modal/SessionDetailsModal";
 import { UpdateSessionModal } from "@/components/modal/UpdateSessionModal";
+import { SmartSearchBar, SearchKey } from "@/components/search/SmartSearchBar";
 import { SegmentedTab } from "@/components/tabs/SegmentedTab";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { useMyAttendance } from "@/hooks/useMyAttendance";
@@ -90,36 +93,83 @@ interface ManageTabProps {
 }
 
 const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance, onSessionDeleted }) => {
-  const { sessions, loading, error, getSessions, removeSession } = useSession();
+  const { sessions, loading, error, getSessions, removeSession, loadMore, hasMore } = useSession();
   const [filter, setFilter] = useState<ManageFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchKey, setSearchKey] = useState<SearchKey>("name");
 
   // Re-fetch every time this screen is focused
   useFocusEffect(
     useCallback(() => {
-      getSessions();
+      getSessions(true);
     }, [getSessions]),
   );
 
   // Poll every 60 seconds while active
   useEffect(() => {
     const interval = setInterval(() => {
-        getSessions();
+        getSessions(true, true);
     }, 60000);
     return () => clearInterval(interval);
   }, [getSessions]);
 
-  // Filtered list
+  // Filtered list — searchKey-aware
   const filtered = useMemo(() => {
-    if (filter === "all") return sessions;
-    return sessions.filter((s: BackendSession) => {
-      const ts = s.session_status;
-      if (filter === "active") return ts === "active";
-      if (filter === "upcoming") return ts === "upcoming";
-      if (filter === "on_break") return ts === "on_break";
-      if (filter === "past") return ts === "past";
-      return true;
+    let base = sessions;
+    if (filter !== "all") {
+      base = sessions.filter((s: BackendSession) => {
+        const ts = s.session_status;
+        if (filter === "active") return ts === "active";
+        if (filter === "upcoming") return ts === "upcoming";
+        if (filter === "on_break") return ts === "on_break";
+        if (filter === "past") return ts === "past";
+        return true;
+      });
+    }
+
+    if (!searchQuery.trim()) return base;
+    const q = searchQuery.toLowerCase().trim();
+
+    return base.filter((s: BackendSession) => {
+      const loc = s.location || {};
+      const sch = s.schedule || {};
+      const det = s.details || {};
+
+      switch (searchKey) {
+        case "name":
+          return s.session_name?.toLowerCase().includes(q);
+        case "code":
+          return s.session_code?.toLowerCase().includes(q);
+        case "time":
+          return sch.start_time?.includes(q) || sch.end_time?.includes(q);
+        case "location": {
+          const locStr = [loc.address, loc.room, loc.building, (loc as any).name, loc.platform]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return locStr.includes(q);
+        }
+        case "type": {
+          // Normalize: on-site / on_site / onsite → same bucket
+          const norm = (v: string) => v.toLowerCase().replace(/[\s_-]/g, "");
+          return norm(s.session_setup || "") === norm(q);
+        }
+        case "frequency": {
+          const norm = (v: string) => v.toLowerCase().replace(/[\s_-]/g, "");
+          return norm(sch.type || "") === norm(q);
+        }
+        default: {
+          // Omni fallback
+          const allStr = [
+            s.session_name, s.session_code, loc.address, loc.room,
+            loc.platform, s.session_setup, sch.type, sch.start_time,
+            ...(s.methods || []), Object.values(det).join(" ")
+          ].filter(Boolean).map(v => String(v).toLowerCase());
+          return allStr.some(v => v.includes(q));
+        }
+      }
     });
-  }, [sessions, filter]);
+  }, [sessions, filter, searchQuery, searchKey]);
 
   // Count badges
   const counts = useMemo(() => {
@@ -157,25 +207,45 @@ const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance, 
 
   return (
     <View style={styles.tabBody}>
-      <SegmentedTab
-        options={filterOptions}
-        activeKey={filter}
-        onChange={(k) => setFilter(k as ManageFilter)}
-      />
-
-      <ScrollView
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.session_id.toString()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={{ paddingBottom: 8 }}>
+            <SmartSearchBar
+              value={searchQuery}
+              searchKey={searchKey}
+              onChangeText={setSearchQuery}
+              onChangeKey={(k) => { setSearchKey(k); setSearchQuery(""); }}
+            />
+
+            <SegmentedTab
+              options={filterOptions}
+              activeKey={filter}
+              onChange={(k) => setFilter(k as ManageFilter)}
+            />
+          </View>
+        }
         refreshControl={
           <RefreshControl
             refreshing={loading.list && sessions.length > 0}
-            onRefresh={getSessions}
+            onRefresh={() => getSessions(true)}
             colors={["#2563EB"]}
             tintColor="#2563EB"
           />
         }
-      >
-        {filtered.length === 0 ? (
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          hasMore && loading.list ? (
+            <View style={{ paddingVertical: 20 }}>
+              <ActivityIndicator size="small" color="#2563EB" />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
           <EmptyState
             icon="calendar-outline"
             title={filter === "all" ? "No sessions yet" : `No ${filter} sessions`}
@@ -185,43 +255,37 @@ const ManageTab: React.FC<ManageTabProps> = ({ onViewSession, onLiveAttendance, 
                 : "Try a different filter above"
             }
           />
-        ) : (
-          filtered.map((session: BackendSession) => {
-            // The backend currently returns role_type: "unknown" for sessions
-            // the user created. Since this IS the Manage (supervisor) tab, we
-            // normalise it to "Supervisors" so SessionCard shows the correct actions.
-            const normalizedSession: BackendSession = {
-              ...session,
-              role_type:
-                session.role_type === "unknown" || !session.role_type
-                  ? "Supervisors"
-                  : session.role_type,
-              // Guard against missing nested fields in the API response
-              details: session.details ?? {},
-              location: session.location ?? {},
-              attended: session.attended ?? false,
-            };
-            return (
-              <SessionCard
-                key={normalizedSession.session_id}
-                session={normalizedSession}
-                onViewDetails={() => onViewSession(normalizedSession)}
-                onManageSession={() => onViewSession(normalizedSession)}
-                onCheckIn={() => onViewSession(normalizedSession)}
-                onLiveAttendance={() => onLiveAttendance(normalizedSession)}
-                onDeleteSession={async (sessionId) => {
-                  try {
-                    await removeSession(sessionId);
-                    onSessionDeleted?.(normalizedSession.session_name);
-                  } catch {
-                    // Error already handled inside removeSession
-                  }
-                }}
-              />
-            );
-          })
-        )}
-      </ScrollView>
+        }
+        renderItem={({ item: session }) => {
+          const normalizedSession: BackendSession = {
+            ...session,
+            role_type:
+              session.role_type === "unknown" || !session.role_type
+                ? "Supervisors"
+                : session.role_type,
+            details: session.details ?? {},
+            location: session.location ?? {},
+            attended: session.attended ?? false,
+          };
+          return (
+            <SessionCard
+              session={normalizedSession}
+              onViewDetails={() => onViewSession(normalizedSession)}
+              onManageSession={() => onViewSession(normalizedSession)}
+              onCheckIn={() => onViewSession(normalizedSession)}
+              onLiveAttendance={() => onLiveAttendance(normalizedSession)}
+              onDeleteSession={async (sessionId) => {
+                try {
+                  await removeSession(sessionId);
+                  onSessionDeleted?.(normalizedSession.session_name);
+                } catch {
+                  // Error already handled
+                }
+              }}
+            />
+          );
+        }}
+      />
     </View>
   );
 };
@@ -236,6 +300,8 @@ interface ParticipateTabProps {
 const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCheckIn, onViewLogs }) => {
   const { categorized, loading, error, refresh } = useMyAttendance();
   const [filter, setFilter] = useState<ParticipateFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchKey, setSearchKey] = useState<SearchKey>("name");
 
   useFocusEffect(
     useCallback(() => {
@@ -245,8 +311,9 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
 
   // Flatten or slice by category
   const records = useMemo<{ record: AttendanceRecord; category: AttendanceCategory }[]>(() => {
+    let baseRecords: { record: AttendanceRecord; category: AttendanceCategory }[] = [];
     if (filter === "all") {
-      return [
+      baseRecords = [
         ...categorized.ongoing.map((r) => ({ record: r, category: "ongoing" as AttendanceCategory })),
         ...categorized.upcoming.map((r) => ({ record: r, category: "upcoming" as AttendanceCategory })),
         ...categorized.completed.map((r) => ({ record: r, category: "completed" as AttendanceCategory })),
@@ -256,18 +323,59 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
       ];
     }
     // "completed" filter tab shows all post-session records together
-    if (filter === "completed") {
-      return [
+    else if (filter === "completed") {
+      baseRecords = [
         ...categorized.completed.map((r) => ({ record: r, category: "completed" as AttendanceCategory })),
         ...categorized.incomplete.map((r) => ({ record: r, category: "incomplete" as AttendanceCategory })),
         ...categorized["no-checkout"].map((r) => ({ record: r, category: "no-checkout" as AttendanceCategory })),
       ];
+    } else {
+      baseRecords = (categorized[filter as keyof typeof categorized] || []).map((r) => ({
+        record: r,
+        category: filter as AttendanceCategory,
+      }));
     }
-    return (categorized[filter as keyof typeof categorized] || []).map((r) => ({
-      record: r,
-      category: filter as AttendanceCategory,
-    }));
-  }, [categorized, filter]);
+
+    if (!searchQuery.trim()) return baseRecords;
+    const q = searchQuery.toLowerCase().trim();
+    return baseRecords.filter(item => {
+      const s = item.record.session;
+      if (!s) return false;
+      const loc = s.location || {};
+      const sch = s.schedule || {};
+      const det = s.details || {};
+
+      switch (searchKey) {
+        case "name":
+          return s.session_name?.toLowerCase().includes(q);
+        case "code":
+          return s.session_code?.toLowerCase().includes(q);
+        case "time":
+          return sch.start_time?.includes(q) || sch.end_time?.includes(q);
+        case "location": {
+          const locStr = [loc.address, loc.room, loc.building, (loc as any).name, loc.platform]
+            .filter(Boolean).join(" ").toLowerCase();
+          return locStr.includes(q);
+        }
+        case "type": {
+          const norm = (v: string) => v.toLowerCase().replace(/[\s_-]/g, "");
+          return norm(s.session_setup || "") === norm(q);
+        }
+        case "frequency": {
+          const norm = (v: string) => v.toLowerCase().replace(/[\s_-]/g, "");
+          return norm(sch.type || "") === norm(q);
+        }
+        default: {
+          const allStr = [
+            s.session_name, s.session_code, loc.address, loc.room,
+            loc.platform, s.session_setup, sch.type, sch.start_time,
+            ...(s.methods || []), Object.values(det).join(" ")
+          ].filter(Boolean).map(v => String(v).toLowerCase());
+          return allStr.some(v => v.includes(q));
+        }
+      }
+    });
+  }, [categorized, filter, searchQuery, searchKey]);
 
   // Count badges
   const counts = useMemo(() => ({
@@ -308,22 +416,43 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
 
   return (
     <View style={styles.tabBody}>
-      <SegmentedTab
-        options={filterOptions}
-        activeKey={filter}
-        onChange={(k) => setFilter(k as ParticipateFilter)}
-        accentColor={
-          filter === "missed"
-            ? "#DC2626"
-            : filter === "ongoing"
-              ? "#059669"
-              : "#001F54"
-        }
-      />
-
-      <ScrollView
+      <FlatList
+        data={records}
+        keyExtractor={(item) => item.record.attendance_id.toString()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={{ paddingBottom: 8 }}>
+            <SmartSearchBar
+              value={searchQuery}
+              searchKey={searchKey}
+              onChangeText={setSearchQuery}
+              onChangeKey={(k) => { setSearchKey(k); setSearchQuery(""); }}
+            />
+
+            <SegmentedTab
+              options={filterOptions}
+              activeKey={filter}
+              onChange={(k) => setFilter(k as ParticipateFilter)}
+              accentColor={
+                filter === "missed"
+                  ? "#DC2626"
+                  : filter === "ongoing"
+                    ? "#059669"
+                    : "#001F54"
+              }
+            />
+
+            {filter === "all" && categorized.ongoing.length > 0 && !searchQuery && (
+              <View style={styles.activeBanner}>
+                <View style={styles.activeBannerDot} />
+                <Text style={styles.activeBannerText}>
+                  {categorized.ongoing.length} session{categorized.ongoing.length > 1 ? "s" : ""} active now
+                </Text>
+              </View>
+            )}
+          </View>
+        }
         refreshControl={
           <RefreshControl
             refreshing={loading}
@@ -332,18 +461,7 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
             tintColor="#2563EB"
           />
         }
-      >
-        {/* ── Active Sessions Banner ── */}
-        {filter === "all" && categorized.ongoing.length > 0 && (
-          <View style={styles.activeBanner}>
-            <View style={styles.activeBannerDot} />
-            <Text style={styles.activeBannerText}>
-              {categorized.ongoing.length} session{categorized.ongoing.length > 1 ? "s" : ""} active now
-            </Text>
-          </View>
-        )}
-
-        {records.length === 0 ? (
+        ListEmptyComponent={
           <EmptyState
             icon="checkmark-circle-outline"
             title={filter === "all" ? "No attendance records" : `No ${filter} sessions`}
@@ -353,31 +471,29 @@ const ParticipateTab: React.FC<ParticipateTabProps> = ({ onViewSession, onOpenCh
                 : "Try a different filter above"
             }
           />
-        ) : (
-          records.map(({ record, category }) => (
-            <AttendanceCard
-              key={record.attendance_id}
-              record={record}
-              category={category}
-              onCheckInPress={() => {
-                if (record.session) {
-                  onOpenCheckIn(record, "check-in");
-                }
-              }}
-              onCheckOutPress={() => {
-                if (record.session) {
-                  onOpenCheckIn(record, "check-out");
-                }
-              }}
-              onViewLogs={() => {
-                if (record.session) {
-                  onViewLogs(record.session.session_id, record.session.session_name || "Session");
-                }
-              }}
-            />
-          ))
+        }
+        renderItem={({ item: { record, category } }) => (
+          <AttendanceCard
+            record={record}
+            category={category}
+            onCheckInPress={() => {
+              if (record.session) {
+                onOpenCheckIn(record, "check-in");
+              }
+            }}
+            onCheckOutPress={() => {
+              if (record.session) {
+                onOpenCheckIn(record, "check-out");
+              }
+            }}
+            onViewLogs={() => {
+              if (record.session) {
+                onViewLogs(record.session.session_id, record.session.session_name || "Session");
+              }
+            }}
+          />
         )}
-      </ScrollView>
+      />
     </View>
   );
 };
@@ -808,6 +924,23 @@ const styles = StyleSheet.create({
   tabBody: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#0F172A',
   },
 
   // Card list

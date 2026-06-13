@@ -40,9 +40,9 @@ const light = {
   card:           "#FFFFFF",
   cardBorder:     "#E8EDF5",
   navHover:       "#F1F5F9",
-  activeBg:       "rgba(37,99,235,0.08)",
-  activeTint:     "#2563EB",
-  activeBar:      "#2563EB",
+  activeBg:       "rgba(0,31,84,0.07)",   // navy tint
+  activeTint:     "#001F54",              // navy
+  activeBar:      "#001F54",              // navy
   iconDefault:    "#94A3B8",
   textPrimary:    "#0F172A",
   textSecondary:  "#64748B",
@@ -52,8 +52,8 @@ const light = {
   dangerBorder:   "rgba(239,68,68,0.15)",
   danger:         "#EF4444",
   online:         "#22C55E",
-  badgeBg:        "rgba(37,99,235,0.10)",
-  badgeText:      "#2563EB",
+  badgeBg:        "rgba(0,31,84,0.09)",   // navy tint
+  badgeText:      "#001F54",              // navy
 };
 
 const dark = {
@@ -61,9 +61,9 @@ const dark = {
   card:           "#161B22",
   cardBorder:     "#21262D",
   navHover:       "#1C2128",
-  activeBg:       "rgba(59,130,246,0.12)",
-  activeTint:     "#60A5FA",
-  activeBar:      "#3B82F6",
+  activeBg:       "rgba(0,31,84,0.25)",   // navy tint — brighter on dark
+  activeTint:     "#4A7CC7",              // lighter navy for dark readability
+  activeBar:      "#001F54",              // navy
   iconDefault:    "#4B5563",
   textPrimary:    "#F0F6FC",
   textSecondary:  "#8B949E",
@@ -73,8 +73,8 @@ const dark = {
   dangerBorder:   "rgba(239,68,68,0.18)",
   danger:         "#F87171",
   online:         "#3FB950",
-  badgeBg:        "rgba(59,130,246,0.15)",
-  badgeText:      "#60A5FA",
+  badgeBg:        "rgba(0,31,84,0.30)",   // navy tint
+  badgeText:      "#7BACD4",              // soft navy-blue for dark mode
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

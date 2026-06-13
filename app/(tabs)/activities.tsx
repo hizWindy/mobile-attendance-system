@@ -274,7 +274,7 @@ const fs = StyleSheet.create({
   pill:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
   pillLight:  { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB" },
   pillDark:   { backgroundColor: "#1F2937", borderColor: "#374151" },
-  pillActive: { backgroundColor: "#3B82F6", borderColor: "#3B82F6" },
+  pillActive: { backgroundColor: "#001F54", borderColor: "#001F54" },
   pillIcon:   { marginRight: 5 },
   pillCheck:  { marginLeft: 5 },
   pillText:   { fontSize: 13, fontWeight: "600" },
@@ -287,12 +287,12 @@ const fs = StyleSheet.create({
   btnClearDark: { backgroundColor: "#1F2937", borderColor: "#374151" },
   btnClearText: { fontSize: 14, fontWeight: "600", color: "#374151" },
   btnClearTextDark: { color: "#9CA3AF" },
-  btnApply:   { flex: 2, paddingVertical: 13, borderRadius: 12, alignItems: "center", backgroundColor: "#3B82F6" },
+  btnApply:   { flex: 2, paddingVertical: 13, borderRadius: 12, alignItems: "center", backgroundColor: "#001F54" },
   btnApplyText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
 
   // Multi-select type section
   actionTypeHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, marginBottom: 6 },
-  clearTypeText: { fontSize: 12, fontWeight: "700", color: "#3B82F6" },
+  clearTypeText: { fontSize: 12, fontWeight: "700", color: "#001F54" },
   typeHint: { fontSize: 11, color: "#9CA3AF", fontWeight: "400", marginBottom: 10 },
   typeHintDark: { color: "#4B5563" },
 });
@@ -401,7 +401,7 @@ export default function ActivitiesScreen() {
         <MaterialCommunityIcons
           name="tune-variant"
           size={15}
-          color={activeFilterCount > 0 ? "#FFFFFF" : "#2563EB"}
+          color={activeFilterCount > 0 ? "#FFFFFF" : "#001F54"}
         />
         <Text style={[styles.filterBtnText, isDark && styles.filterBtnTextDark, activeFilterCount > 0 && styles.filterBtnTextActive]}>
           {activeFilterCount > 0 ? `Filter · ${activeFilterCount}` : "Filter"}
@@ -503,7 +503,7 @@ export default function ActivitiesScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#9CA3AF"
-            colors={["#3B82F6"]}
+            colors={["#001F54"]}
           />
         }
       />
@@ -577,8 +577,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E293B",
   },
   filterBtnActive: {
-    backgroundColor: "#2563EB",
-    shadowColor: "#2563EB",
+    backgroundColor: "#001F54",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
   filterBtnText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#2563EB",
+    color: "#001F54",
     letterSpacing: 0.1,
   },
   filterBtnTextDark: { color: "#94A3B8" },
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#001F54",
   },
   sectionHeaderText: {
     flex: 1,
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   sectionCountDark: { backgroundColor: "#1E293B" },
-  sectionCountText: { fontSize: 11, fontWeight: "700", color: "#2563EB" },
+  sectionCountText: { fontSize: 11, fontWeight: "700", color: "#001F54" },
   sectionSep: { height: 4 },
 
   // Empty / Error
@@ -634,8 +634,8 @@ const styles = StyleSheet.create({
   emptyIconDark: { backgroundColor: "#1F2937" },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22, maxWidth: 280 },
-  clearBtn: { marginTop: 16, backgroundColor: "#3B82F6", paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
+  clearBtn: { marginTop: 16, backgroundColor: "#001F54", paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
   clearBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  retryBtn: { marginTop: 20, backgroundColor: "#3B82F6", paddingHorizontal: 24, paddingVertical: 11, borderRadius: 12 },
+  retryBtn: { marginTop: 20, backgroundColor: "#001F54", paddingHorizontal: 24, paddingVertical: 11, borderRadius: 12 },
   retryBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 });

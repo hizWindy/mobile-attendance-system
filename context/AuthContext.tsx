@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { AuthService } from "../api/AuthService";
 import UserService from "../api/UserService";
 import api, { clearAuthHeader } from "../api/AxiosInstance";
-
+import { registerPushToken, unregisterPushToken } from "../utils/pushNotifications";
 
 import { Alert } from "react-native";
 
@@ -46,6 +46,9 @@ export const AuthProvider = ({ children }: any) => {
         await fetchUser();
         // Set token state last, which unblocks the rest of the application
         setToken(access_token);
+
+        // Register push token after successful login (non-blocking)
+        registerPushToken();
     };
 
     const signup = async (signupData: any) => {
@@ -59,6 +62,9 @@ export const AuthProvider = ({ children }: any) => {
 
         await fetchUser();
         setToken(access_token);
+
+        // Register push token after successful signup (non-blocking)
+        registerPushToken();
     };
 
     const fetchUser = async () => {
@@ -81,6 +87,8 @@ export const AuthProvider = ({ children }: any) => {
 
     const logout = async () => {
         try {
+            // 🔕 Remove device push token before logout
+            await unregisterPushToken();
             // 📞 Try to inform backend about logout
             await AuthService.logout();
         } catch (e) {

@@ -826,6 +826,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         }
       } else if (datePickerMode === "end") {
         setEndDate(dateStr);
+        if (smartWarning && smartWarning.includes("End date was reset")) setSmartWarning(null);
       } else if (datePickerMode === "custom") {
         if (!customDates.includes(dateStr)) {
           setCustomDates(prev => [...prev, dateStr]);
@@ -856,6 +857,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       }
       else {
           setEndTime(timeStr);
+          if (smartWarning && smartWarning.includes("End time was reset")) setSmartWarning(null);
       }
     }
   };

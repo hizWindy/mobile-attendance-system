@@ -7,5 +7,7 @@ export const API_ROUTES = {
   AUTH: "/auth",
   USERS : "/users",
   ACTIVITIES: "/activities",
+  NOTIFICATIONS: "/notifications",
+  USER_DEVICES: "/user-devices",
   
 } as const;

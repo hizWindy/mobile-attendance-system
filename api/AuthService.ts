@@ -1,4 +1,5 @@
 import api from "./AxiosInstance";
+import { API_ROUTES } from "./ApiRoutes";
 
 export interface SignupData {
   first_name: string;
@@ -13,7 +14,7 @@ export const AuthService = {
 
   // 🔐 LOGIN
   async login(user_name: string, password: string) {
-    const response = await api.post("/auth/login", {
+    const response = await api.post(`${API_ROUTES.AUTH}/login`, {
       user_name,
       password,
     });
@@ -22,13 +23,13 @@ export const AuthService = {
 
   // 📝 SIGNUP
   async signup(signupData: SignupData) {
-    const response = await api.post("/auth/signup", signupData);
+    const response = await api.post(`${API_ROUTES.AUTH}/signup`, signupData);
     return response.data;
   },
 
   // 🔄 REFRESH TOKEN (FIXED)
   async refreshToken(refresh_token: string) {
-    const response = await api.post("/auth/refresh", {
+    const response = await api.post(`${API_ROUTES.AUTH}/refresh`, {
       refresh_token, // ✅ send as JSON body (matches backend)
     });
     return response.data;
@@ -37,7 +38,7 @@ export const AuthService = {
   // 🚪 LOGOUT
   async logout() {
     try {
-      const response = await api.post("/auth/logout");
+      const response = await api.post(`${API_ROUTES.AUTH}/logout`);
       return response.data;
     } catch (e) {
       console.warn("Logout request failed:", e);

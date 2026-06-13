@@ -13,12 +13,14 @@
  *    avatar, nav items, active highlighting, logout
  */
 
+import NotificationService from "@/api/NotificationService";
 import CustomDrawerContent from "@/components/layout/CustomDrawerContent";
 import CustomHeader from "@/components/layout/CustomHeader";
 import { AuthContext } from "@/context/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
-import React, { useContext } from "react";
+import React, { useCallback, useContext, useState } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -27,6 +29,26 @@ const ACTIVE_COLOR = "#001F54";
 
 export default function DrawerLayout() {
   const { user } = useContext(AuthContext);
+  const router = useRouter();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread count on focus (non-blocking)
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUnread = async () => {
+        try {
+          const res = await NotificationService.getUnreadCount();
+          if (res.success) setUnreadCount(res.count);
+        } catch {
+          // Silent fail — badge just shows 0
+        }
+      };
+      fetchUnread();
+      // Poll every 30 seconds while focused
+      const interval = setInterval(fetchUnread, 30_000);
+      return () => clearInterval(interval);
+    }, [])
+  );
 
   const headerUser = {
     name: user ? `${user.first_name} ${user.last_name}` : "Guest",
@@ -64,10 +86,11 @@ export default function DrawerLayout() {
           header: ({ route, options }) => (
             <CustomHeader
               user={headerUser}
-              notificationCount={5}
-              onNotificationPress={() =>
-                console.log("notifications pressed")
-              }
+              notificationCount={unreadCount}
+              onNotificationPress={() => {
+                setUnreadCount(0); // Optimistically reset badge
+                router.push("/(tabs)/notifications");
+              }}
               onMenuPress={() => navigation.toggleDrawer()}
             />
           ),
@@ -145,6 +168,16 @@ export default function DrawerLayout() {
           options={{
             drawerLabel: "Profile",
             title: "Profile",
+            drawerItemStyle: { display: "none" }, // Hidden from menu
+          }}
+        />
+
+        {/* Notifications — hidden from drawer, navigable via bell icon */}
+        <Drawer.Screen
+          name="notifications"
+          options={{
+            drawerLabel: "Notifications",
+            title: "Notifications",
             drawerItemStyle: { display: "none" }, // Hidden from menu
           }}
         />

@@ -32,12 +32,12 @@ const light = {
   surface:      "#F1F5F9",
   surfacePress: "#E2E8F0",
   border:       "#E8EDF5",
-  accent:       "#2563EB",
-  accentLight:  "#EFF6FF",
+  accent:       "#001F54",             // navy
+  accentLight:  "rgba(0,31,84,0.07)", // navy tint
   textPrimary:  "#0F172A",
   textSecondary:"#64748B",
   icon:         "#64748B",
-  iconPress:    "#2563EB",
+  iconPress:    "#001F54",            // navy
   danger:       "#EF4444",
   online:       "#22C55E",
 };
@@ -47,12 +47,12 @@ const dark = {
   surface:      "#161B22",
   surfacePress: "#1C2128",
   border:       "#21262D",
-  accent:       "#60A5FA",
-  accentLight:  "rgba(59,130,246,0.12)",
+  accent:       "#4A7CC7",              // lighter navy — readable on dark
+  accentLight:  "rgba(0,31,84,0.25)",  // navy tint
   textPrimary:  "#F0F6FC",
   textSecondary:"#8B949E",
   icon:         "#6B7280",
-  iconPress:    "#60A5FA",
+  iconPress:    "#4A7CC7",             // lighter navy
   danger:       "#F87171",
   online:       "#3FB950",
 };

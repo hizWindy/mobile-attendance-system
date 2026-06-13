@@ -50,16 +50,22 @@ function fmtPct(n: number): string {
 interface KpiCardProps {
   value: string;
   label: string;
+  sub?: string;
+  accent?: string;
   isDark: boolean;
 }
 
-function KpiCard({ value, label, isDark }: KpiCardProps) {
+function KpiCard({ value, label, sub, accent = "#001F54", isDark }: KpiCardProps) {
   return (
     <View style={[styles.kpiCard, isDark && styles.kpiCardDark]}>
+      <View style={[styles.kpiAccentDot, { backgroundColor: accent + "22" }]}>
+        <View style={[styles.kpiAccentInner, { backgroundColor: accent }]} />
+      </View>
       <Text style={[styles.kpiValue, isDark && styles.kpiValueDark]} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text style={styles.kpiLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.kpiLabel, isDark && styles.kpiLabelDark]} numberOfLines={2}>{label}</Text>
+      {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
     </View>
   );
 }
@@ -76,7 +82,10 @@ function ProgressRow({ label, pct, color, isDark }: ProgressRowProps) {
   return (
     <View style={styles.progressRow}>
       <View style={styles.progressLabelRow}>
-        <Text style={[styles.progressLabel, isDark && styles.textSecondaryDark]}>{label}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={[styles.progressDot, { backgroundColor: color }]} />
+          <Text style={[styles.progressLabel, isDark && styles.textSecondaryDark]}>{label}</Text>
+        </View>
         <Text style={[styles.progressPct, { color }]}>{fmtPct(clampedPct)}</Text>
       </View>
       <View style={[styles.progressTrack, isDark && styles.progressTrackDark]}>
@@ -96,13 +105,10 @@ interface SectionHeaderProps {
 function SectionTitle({ title, isDark, onSeeAll, seeAllCount }: SectionHeaderProps) {
   return (
     <View style={styles.sectionTitleRow}>
-      <View style={styles.sectionTitleLeft}>
-        <View style={styles.sectionAccent} />
-        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{title}</Text>
-      </View>
+      <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{title}</Text>
       {onSeeAll && (
-        <TouchableOpacity style={styles.seeAllBtn} onPress={onSeeAll}>
-          <Text style={styles.seeAllText}>See All {seeAllCount ? `(${seeAllCount}) ` : ""}→</Text>
+        <TouchableOpacity style={styles.seeAllBtn} onPress={onSeeAll} activeOpacity={0.7}>
+          <Text style={styles.seeAllText}>See all{seeAllCount ? ` (${seeAllCount})` : ""}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -115,7 +121,7 @@ interface ResultBadgeProps {
 
 function ResultBadge({ status }: ResultBadgeProps) {
   const map: Record<string, { bg: string; text: string; label: string }> = {
-    complete:   { bg: "#EEF2FF", text: "#4F46E5", label: "Complete"   },
+    complete:   { bg: "#EEF2FF", text: "#001F54", label: "Complete"   },
     incomplete: { bg: "#FFF7ED", text: "#F97316", label: "Incomplete" },
     missed:     { bg: "#FEF2F2", text: "#EF4444", label: "Missed"     },
     no_checkout:{ bg: "#F9FAFB", text: "#9CA3AF", label: "No Checkout"},
@@ -151,7 +157,7 @@ function ArrivalBadge({ status }: ArrivalBadgeProps) {
 function LoadingView() {
   return (
     <View style={styles.centerWrap}>
-      <ActivityIndicator size="large" color="#4F46E5" />
+      <ActivityIndicator size="large" color="#001F54" />
       <Text style={styles.centerText}>Loading analytics...</Text>
     </View>
   );
@@ -179,25 +185,44 @@ interface SupervisorViewProps {
 }
 
 function SupervisorView({ isDark, overview, sessions, onShowAll }: SupervisorViewProps) {
+  const T = isDark ? { bg: "#1E293B", text: "#F1F5F9", sub: "#94A3B8", border: "#334155" }
+                   : { bg: "#FFFFFF", text: "#0F172A", sub: "#64748B", border: "#F1F5F9" };
   return (
     <>
-      {/* KPI Row 1 */}
-      <View style={styles.kpiRow}>
-        <KpiCard value={String(overview.total_sessions)}  label="Sessions"  isDark={isDark} />
-        <KpiCard value={String(overview.total_enrolled)}  label="Enrolled"  isDark={isDark} />
-        <KpiCard value={fmtPct(overview.overall_completion_rate)} label="Complete" isDark={isDark} />
+      {/* Hero stat — the single most important number */}
+      <View style={[styles.heroCard, { backgroundColor: "#001F54" }]}>
+        <Text style={styles.heroLabel}>Overall Attendance Rate</Text>
+        <Text style={styles.heroValue}>{fmtPct(overview.overall_attendance_rate)}</Text>
+        <View style={styles.heroRow}>
+          <View style={styles.heroChip}>
+            <View style={[styles.heroChipDot, { backgroundColor: "#22C55E" }]} />
+            <Text style={styles.heroChipText}>{overview.active_sessions} active</Text>
+          </View>
+          <View style={styles.heroChip}>
+            <View style={[styles.heroChipDot, { backgroundColor: "#F97316" }]} />
+            <Text style={styles.heroChipText}>{overview.total_sessions} total</Text>
+          </View>
+        </View>
       </View>
 
-      {/* KPI Row 2 */}
-      <View style={styles.kpiRow}>
-        <KpiCard value={String(overview.active_sessions)}   label="Active"      isDark={isDark} />
-        <KpiCard value={fmtPct(overview.overall_attendance_rate)} label="Attendance" isDark={isDark} />
-        <KpiCard value={String(overview.total_no_checkout)} label="No Checkout" isDark={isDark} />
+      {/* 2x2 Stat Grid */}
+      <View style={styles.statGrid}>
+        {[
+          { value: String(overview.total_enrolled),           label: "Enrolled",    accent: "#2563EB" },
+          { value: fmtPct(overview.overall_completion_rate),  label: "Completion",  accent: "#22C55E" },
+          { value: String(overview.total_no_checkout),        label: "No Checkout", accent: "#EF4444" },
+          { value: fmtPct(overview.overall_on_time_rate),     label: "On-time",     accent: "#F97316" },
+        ].map((item) => (
+          <View key={item.label} style={[styles.statCell, { backgroundColor: T.bg }]}>
+            <Text style={[styles.statCellValue, { color: item.accent }]}>{item.value}</Text>
+            <Text style={[styles.statCellLabel, { color: T.sub }]}>{item.label}</Text>
+          </View>
+        ))}
       </View>
 
       {/* Punctuality Breakdown */}
       <View style={[styles.card, isDark && styles.cardDark]}>
-        <SectionTitle title="Punctuality Breakdown" isDark={isDark} />
+        <SectionTitle title="Punctuality" isDark={isDark} />
         <View style={styles.cardBody}>
           <ProgressRow label="On-time" pct={overview.overall_on_time_rate} color="#22C55E" isDark={isDark} />
           <ProgressRow label="Late"    pct={overview.overall_late_rate}    color="#F97316" isDark={isDark} />
@@ -207,14 +232,14 @@ function SupervisorView({ isDark, overview, sessions, onShowAll }: SupervisorVie
 
       {/* Sessions List */}
       <View style={[styles.card, isDark && styles.cardDark]}>
-        <SectionTitle 
-          title="My Sessions Performance" 
-          isDark={isDark} 
+        <SectionTitle
+          title="Sessions Performance"
+          isDark={isDark}
           onSeeAll={sessions.length > 3 ? onShowAll : undefined}
           seeAllCount={sessions.length > 3 ? sessions.length : undefined}
         />
         {sessions.length === 0 ? (
-          <Text style={styles.emptyText}>No sessions found.</Text>
+          <Text style={styles.emptyText}>No sessions yet.</Text>
         ) : (
           sessions.slice(0, 3).map((s, i) => (
             <View key={s.session_id} style={[styles.sessionRow, i > 0 && styles.sessionRowBorder, i > 0 && isDark && styles.sessionRowBorderDark]}>
@@ -246,7 +271,7 @@ function SupervisorView({ isDark, overview, sessions, onShowAll }: SupervisorVie
                   <Text style={styles.sessionStatLabel}>Missed</Text>
                 </View>
               </View>
-              <ProgressRow label="Completion" pct={s.completion_rate} color="#4F46E5" isDark={isDark} />
+              <ProgressRow label="Completion" pct={s.completion_rate} color="#001F54" isDark={isDark} />
             </View>
           ))
         )}
@@ -267,56 +292,65 @@ interface AttendeeViewProps {
 function AttendeeView({ isDark, overview, sessions, onShowAll }: AttendeeViewProps) {
   return (
     <>
-      {/* KPI Row 1 */}
-      <View style={styles.kpiRow}>
-        <KpiCard value={String(overview.total_sessions_joined)} label="Joined"   isDark={isDark} />
-        <KpiCard value={fmtPct(overview.completion_rate)}       label="Complete" isDark={isDark} />
-        <KpiCard value={fmtPct(overview.on_time_rate)}          label="On-time"  isDark={isDark} />
+      {/* Hero — Completion rate */}
+      <View style={[styles.heroCard, { backgroundColor: "#001F54" }]}>
+        <Text style={styles.heroLabel}>Your Completion Rate</Text>
+        <Text style={styles.heroValue}>{fmtPct(overview.completion_rate)}</Text>
+        <View style={styles.heroRow}>
+          <View style={styles.heroChip}>
+            <View style={[styles.heroChipDot, { backgroundColor: "#22C55E" }]} />
+            <Text style={styles.heroChipText}>{overview.total_sessions_joined} sessions joined</Text>
+          </View>
+          <View style={styles.heroChip}>
+            <View style={[styles.heroChipDot, { backgroundColor: "#F97316" }]} />
+            <Text style={styles.heroChipText}>{fmtPct(overview.on_time_rate)} on-time</Text>
+          </View>
+        </View>
       </View>
 
-      {/* Streak Card */}
+      {/* Streak Card — navy brand */}
       <View style={styles.streakCard}>
         <View style={styles.streakItem}>
           <Text style={styles.streakEmoji}>🔥</Text>
           <Text style={styles.streakValue}>{overview.current_streak}</Text>
-          <Text style={styles.streakLabel}>Current Streak</Text>
+          <Text style={styles.streakLabel}>Current streak</Text>
         </View>
         <View style={styles.streakDivider} />
         <View style={styles.streakItem}>
           <Text style={styles.streakEmoji}>🏆</Text>
           <Text style={[styles.streakValue, styles.streakLongest]}>{overview.longest_streak}</Text>
-          <Text style={styles.streakLabel}>Longest Streak</Text>
+          <Text style={styles.streakLabel}>Best streak</Text>
         </View>
       </View>
 
       {/* Time Summary */}
       <View style={[styles.card, isDark && styles.cardDark]}>
-        <SectionTitle title="⏱️ Time Summary" isDark={isDark} />
+        <SectionTitle title="Time Rendered" isDark={isDark} />
         <View style={styles.timeSummary}>
           <View style={styles.timeSummaryItem}>
             <Text style={[styles.timeSummaryValue, isDark && styles.textPrimaryDark]}>
               {fmtSecs(overview.total_time_rendered_secs)}
             </Text>
-            <Text style={styles.timeSummaryLabel}>Total Time</Text>
+            <Text style={styles.timeSummaryLabel}>Total time</Text>
           </View>
           <View style={[styles.timeDivider, isDark && styles.timeDividerDark]} />
           <View style={styles.timeSummaryItem}>
             <Text style={[styles.timeSummaryValue, isDark && styles.textPrimaryDark]}>
               {fmtSecs(overview.avg_time_rendered_secs)}
             </Text>
-            <Text style={styles.timeSummaryLabel}>Avg per Session</Text>
+            <Text style={styles.timeSummaryLabel}>Avg / session</Text>
           </View>
           <View style={[styles.timeDivider, isDark && styles.timeDividerDark]} />
           <View style={styles.timeSummaryItem}>
             <Text style={[styles.timeSummaryValue, { color: "#EF4444" }]}>{overview.no_checkout_count}</Text>
-            <Text style={styles.timeSummaryLabel}>No Checkout</Text>
+            <Text style={styles.timeSummaryLabel}>No checkout</Text>
           </View>
         </View>
       </View>
 
       {/* Arrival Breakdown */}
       <View style={[styles.card, isDark && styles.cardDark]}>
-        <SectionTitle title="Arrival Breakdown" isDark={isDark} />
+        <SectionTitle title="Arrival Pattern" isDark={isDark} />
         <View style={styles.cardBody}>
           <ProgressRow label="On-time" pct={overview.on_time_rate} color="#22C55E" isDark={isDark} />
           <ProgressRow label="Late"    pct={overview.late_rate}    color="#F97316" isDark={isDark} />
@@ -326,14 +360,14 @@ function AttendeeView({ isDark, overview, sessions, onShowAll }: AttendeeViewPro
 
       {/* Session History */}
       <View style={[styles.card, isDark && styles.cardDark]}>
-        <SectionTitle 
-          title="My Session History" 
-          isDark={isDark} 
+        <SectionTitle
+          title="Session History"
+          isDark={isDark}
           onSeeAll={sessions.length > 3 ? onShowAll : undefined}
           seeAllCount={sessions.length > 3 ? sessions.length : undefined}
         />
         {sessions.length === 0 ? (
-          <Text style={styles.emptyText}>No sessions found.</Text>
+          <Text style={styles.emptyText}>No sessions yet.</Text>
         ) : (
           sessions.slice(0, 3).map((s, i) => (
             <View key={s.session_id} style={[styles.sessionRow, i > 0 && styles.sessionRowBorder, i > 0 && isDark && styles.sessionRowBorderDark]}>
@@ -352,7 +386,7 @@ function AttendeeView({ isDark, overview, sessions, onShowAll }: AttendeeViewPro
               <ProgressRow
                 label="Completion"
                 pct={s.completion_percentage}
-                color="#4F46E5"
+                color="#001F54"
                 isDark={isDark}
               />
             </View>
@@ -482,28 +516,22 @@ export default function AnalyticsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#4F46E5"
-            colors={["#4F46E5"]}
+            tintColor="#001F54"
+            colors={["#001F54"]}
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, isDark && styles.textPrimaryDark]}>Analytics</Text>
-          <Text style={styles.headerSubtitle}>
-            {activeTab === "supervisor" ? "Your sessions at a glance" : "Your personal performance"}
-          </Text>
-        </View>
 
         {/* Role Toggle */}
         <View style={styles.tabWrap}>
           <SegmentedTab
             options={[
-              { key: "attendee",   label: "📋  As Attendee"   },
-              { key: "supervisor", label: "📊  As Supervisor" },
+              { key: "attendee",   label: "Attendee"   },
+              { key: "supervisor", label: "Supervisor" },
             ]}
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key as "attendee" | "supervisor")}
+            accentColor="#001F54"
           />
         </View>
 
@@ -522,92 +550,124 @@ export default function AnalyticsScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // Layout
-  container:      { flex: 1, backgroundColor: "#F9FAFB" },
+  container:      { flex: 1, backgroundColor: "#F0F4FF" },
   containerDark:  { backgroundColor: "#0F172A" },
-  scroll:         { padding: 16, paddingBottom: 48 },
-
-  // Header
-  header:         { marginBottom: 16 },
-  headerTitle:    { fontSize: 24, fontWeight: "800", color: "#111827", letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 13, fontWeight: "500", color: "#9CA3AF", marginTop: 3 },
+  scroll:         { padding: 20, paddingBottom: 60 },
 
   // Tab toggle
-  tabWrap: { marginBottom: 20 },
+  tabWrap: { marginBottom: 24 },
 
-  // KPI Cards
+  // ── Hero Card (primary metric) ─────────────────────────────────────────────
+  heroCard: {
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 12,
+    shadowColor: "#001F54",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  heroLabel:    { fontSize: 12, fontWeight: "600", color: "rgba(255,255,255,0.6)", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" },
+  heroValue:    { fontSize: 52, fontWeight: "800", color: "#FFFFFF", letterSpacing: -2, lineHeight: 58 },
+  heroRow:      { flexDirection: "row", gap: 10, marginTop: 16, flexWrap: "wrap" },
+  heroChip:     { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
+  heroChipDot:  { width: 7, height: 7, borderRadius: 4 },
+  heroChipText: { fontSize: 12, fontWeight: "600", color: "rgba(255,255,255,0.85)" },
+
+  // ── 2x2 Stat Grid ─────────────────────────────────────────────────────────
+  statGrid:      { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  statCell:      {
+    width: "47.5%",
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: "#001F54",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statCellValue: { fontSize: 24, fontWeight: "800", marginBottom: 4, letterSpacing: -0.4 },
+  statCellLabel: { fontSize: 12, fontWeight: "500" },
+
+  // ── KPI Cards ──────────────────────────────────────────────────────────────
   kpiRow:     { flexDirection: "row", gap: 10, marginBottom: 10 },
   kpiCard:    {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#000",
+    borderRadius: 18,
+    padding: 14,
+    alignItems: "flex-start",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  kpiCardDark:  { backgroundColor: "#1E293B" },
-  kpiValue:     { fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 4 },
-  kpiValueDark: { color: "#F9FAFB" },
-  kpiLabel:     { fontSize: 11, fontWeight: "500", color: "#9CA3AF", textAlign: "center" },
+  kpiCardDark:   { backgroundColor: "#1E293B" },
+  kpiAccentDot:  { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  kpiAccentInner:{ width: 10, height: 10, borderRadius: 5 },
+  kpiValue:      { fontSize: 22, fontWeight: "800", color: "#0F172A", marginBottom: 2, letterSpacing: -0.3 },
+  kpiValueDark:  { color: "#F1F5F9" },
+  kpiLabel:      { fontSize: 11, fontWeight: "500", color: "#94A3B8", lineHeight: 15 },
+  kpiLabelDark:  { color: "#64748B" },
+  kpiSub:        { fontSize: 10, color: "#CBD5E1", marginTop: 2 },
 
   // Streak Card
   streakCard: {
-    backgroundColor: "#FFF7ED",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: "#001F54",
+    borderRadius: 20,
+    padding: 20,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    marginBottom: 10,
-    shadowColor: "#F97316",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 12,
+    shadowColor: "#001F54",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 6,
   },
   streakItem:    { alignItems: "center", flex: 1 },
-  streakEmoji:   { fontSize: 28, marginBottom: 4 },
-  streakValue:   { fontSize: 28, fontWeight: "700", color: "#EA580C" },
-  streakLongest: { color: "#D97706" },
-  streakLabel:   { fontSize: 12, fontWeight: "600", color: "#9A3412", marginTop: 4 },
-  streakDivider: { width: 1, height: 60, backgroundColor: "#FED7AA" },
+  streakEmoji:   { fontSize: 26, marginBottom: 6 },
+  streakValue:   { fontSize: 30, fontWeight: "800", color: "#FFFFFF" },
+  streakLongest: { color: "#93B4DD" },
+  streakLabel:   { fontSize: 11, fontWeight: "600", color: "rgba(255,255,255,0.5)", marginTop: 4 },
+  streakDivider: { width: 1, height: 50, backgroundColor: "rgba(255,255,255,0.15)" },
 
   // Section title
   sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   sectionTitleLeft:{ flexDirection: "row", alignItems: "center" },
-  sectionAccent:   { width: 3, height: 18, borderRadius: 2, backgroundColor: "#4F46E5", marginRight: 8 },
+  sectionAccent:   { width: 3, height: 18, borderRadius: 2, backgroundColor: "#001F54", marginRight: 8 },
   sectionTitle:    { fontSize: 15, fontWeight: "700", color: "#111827" },
   sectionTitleDark:{ color: "#F9FAFB" },
   seeAllBtn:       { paddingVertical: 4, paddingHorizontal: 8 },
-  seeAllText:      { fontSize: 12, fontWeight: "700", color: "#4F46E5" },
+  seeAllText:      { fontSize: 12, fontWeight: "700", color: "#001F54" },
 
   // Generic card
   card:     {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 12,
-    shadowColor: "#000",
+    shadowColor: "#001F54",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
   },
   cardDark: { backgroundColor: "#1E293B" },
-  cardBody: { gap: 12 },
+  cardBody: { gap: 14 },
 
   // Progress bar
-  progressRow:     { marginBottom: 10 },
-  progressLabelRow:{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  progressLabel:   { fontSize: 13, fontWeight: "500", color: "#6B7280" },
-  progressPct:     { fontSize: 13, fontWeight: "700" },
-  progressTrack:   { height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" },
+  progressRow:      { marginBottom: 12 },
+  progressLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  progressDot:      { width: 7, height: 7, borderRadius: 4 },
+  progressLabel:    { fontSize: 13, fontWeight: "500", color: "#64748B" },
+  progressPct:      { fontSize: 13, fontWeight: "700" },
+  progressTrack:    { height: 10, backgroundColor: "#F1F5F9", borderRadius: 8, overflow: "hidden" },
   progressTrackDark:{ backgroundColor: "#334155" },
-  progressFill:    { height: 8, borderRadius: 4 },
+  progressFill:     { height: 10, borderRadius: 8 },
 
   // Time summary
   timeSummary:     { flexDirection: "row", justifyContent: "space-around", paddingVertical: 8 },
@@ -618,17 +678,17 @@ const styles = StyleSheet.create({
   timeDividerDark: { backgroundColor: "#334155" },
 
   // Session rows inside cards
-  sessionRow:           { paddingVertical: 12 },
-  sessionRowBorder:     { borderTopWidth: 1, borderTopColor: "#E5E7EB" },
+  sessionRow:           { paddingVertical: 14 },
+  sessionRowBorder:     { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E2E8F0" },
   sessionRowBorderDark: { borderTopColor: "#334155" },
-  sessionRowTop:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  sessionName:          { fontSize: 14, fontWeight: "600", color: "#111827", flex: 1, marginRight: 8 },
-  sessionStats:         { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  sessionRowTop:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  sessionName:          { fontSize: 14, fontWeight: "600", color: "#0F172A", flex: 1, marginRight: 8 },
+  sessionStats:         { flexDirection: "row", justifyContent: "space-between", marginBottom: 12, paddingHorizontal: 2 },
   sessionStatItem:      { alignItems: "center" },
-  sessionStatValue:     { fontSize: 15, fontWeight: "700", color: "#111827" },
-  sessionStatLabel:     { fontSize: 10, color: "#9CA3AF", marginTop: 2 },
-  sessionBadgeRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  sessionTimeText:      { fontSize: 12, color: "#9CA3AF", fontWeight: "500" },
+  sessionStatValue:     { fontSize: 16, fontWeight: "700", color: "#0F172A", letterSpacing: -0.2 },
+  sessionStatLabel:     { fontSize: 10, color: "#94A3B8", marginTop: 3, fontWeight: "500" },
+  sessionBadgeRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  sessionTimeText:      { fontSize: 12, color: "#94A3B8", fontWeight: "500" },
 
   // Status pill
   statusPill:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
@@ -646,7 +706,7 @@ const styles = StyleSheet.create({
   emptyText:  { fontSize: 14, color: "#9CA3AF", textAlign: "center", paddingVertical: 20 },
   centerWrap: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 32 },
   centerText: { fontSize: 14, color: "#6B7280", marginTop: 16, textAlign: "center" },
-  retryBtn:   { marginTop: 20, backgroundColor: "#4F46E5", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 },
+  retryBtn:   { marginTop: 20, backgroundColor: "#001F54", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 },
   retryText:  { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 
   // Dark mode text helpers

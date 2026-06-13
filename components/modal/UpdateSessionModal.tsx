@@ -453,6 +453,78 @@ export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
     setRemoteLink("");
   }, []);
 
+  useEffect(() => {
+    if (visible && session) {
+      setSessionName(session.session_name || "");
+      
+      const typeMap: Record<string, "On-site" | "Remote" | "Hybrid"> = {
+        on_site: "On-site",
+        remote: "Remote",
+        hybrid: "Hybrid"
+      };
+      setSessionType(typeMap[session.session_setup] || "On-site");
+      setSelectedMethods(session.methods || ["manual"]);
+
+      if (session.location) {
+        setLocation(session.location.address || session.location.name || "");
+        if (session.location.radius) setRadius(String(session.location.radius));
+        if (session.location.latitude && session.location.longitude) {
+          setExactCoords({
+            lat: String(session.location.latitude),
+            lon: String(session.location.longitude)
+          });
+        }
+        if (session.location.platform) setRemotePlatform(session.location.platform);
+        if (session.location.link) setRemoteLink(session.location.link);
+      }
+
+      if (session.schedule) {
+        setScheduleType(session.schedule.type || "one-time");
+        setStartDate(session.schedule.start_date || "");
+        setEndDate(session.schedule.end_date || "");
+        if (session.schedule.start_time) {
+          setStartTime(session.schedule.start_time.substring(0, 5));
+        }
+        if (session.schedule.end_time) {
+          setEndTime(session.schedule.end_time.substring(0, 5));
+        }
+        if (session.schedule.days_of_week) setDaysOfWeek(session.schedule.days_of_week);
+        if (session.schedule.dates) setCustomDates(session.schedule.dates);
+        if (session.schedule.include_weekends !== undefined) setIncludeWeekends(session.schedule.include_weekends);
+      }
+
+      if (session.attendance_config) {
+        if (session.attendance_config.grace_period_mins !== undefined) {
+          setGracePeriodMinutes(session.attendance_config.grace_period_mins);
+        }
+        if (session.attendance_config.absent_limit_mins !== undefined) {
+          setAbsentLimitMinutes(String(session.attendance_config.absent_limit_mins));
+        }
+      }
+
+      if (session.qr_config) {
+        setQrMode(session.qr_config.qr_mode || "permanent");
+        if (session.qr_config.refresh_interval_secs) {
+          setQrRefreshIntervalSecs(String(session.qr_config.refresh_interval_secs));
+        }
+        if (session.qr_config.window_secs) {
+          setQrWindowSecs(String(session.qr_config.window_secs));
+        }
+      }
+
+      if (session.details) {
+        const detailsArr = Object.entries(session.details).map(([key, value]) => ({
+          key,
+          value: String(value)
+        }));
+        setAdditionalDetails(detailsArr);
+      }
+    } else if (visible && !session) {
+      resetForm();
+    }
+  }, [visible, session, resetForm]);
+
+
   // â”€â”€ sanitizeNumber: silently clamp numeric inputs while typing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sanitizeNumber = (val: string, min: number, max: number): string => {
     const stripped = val.replace(/^0+(?=\d)/, "").replace(/[^0-9]/g, "");
@@ -828,6 +900,7 @@ export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
         }
       } else if (datePickerMode === "end") {
         setEndDate(dateStr);
+        if (smartWarning && smartWarning.includes("End date was reset")) setSmartWarning(null);
       } else if (datePickerMode === "custom") {
         if (!customDates.includes(dateStr)) {
           setCustomDates(prev => [...prev, dateStr]);
@@ -858,6 +931,7 @@ export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
       }
       else {
           setEndTime(timeStr);
+          if (smartWarning && smartWarning.includes("End time was reset")) setSmartWarning(null);
       }
     }
   };
@@ -1159,8 +1233,8 @@ export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
         {/* Header */}
         <View style={[styles.headerStandard, isDark && styles.headerDark]}>
           <View>
-            <Text style={styles.headerTitle}>New Session</Text>
-            <Text style={styles.headerSub}>Attendance portal configuration</Text>
+            <Text style={styles.headerTitle}>Update Session</Text>
+            <Text style={styles.headerSub}>Modify session configuration</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtnStandard}>
             <Ionicons name="close" size={24} color="#0F172A" />
@@ -1992,15 +2066,15 @@ export const UpdateSessionModal: React.FC<UpdateSessionModalProps> = ({
           <Animated.View style={{ transform: [{ translateX: submitBtnAnim }] }}>
             <TouchableOpacity
               style={styles.primaryActionBtn}
-              onPress={handleGenerate}
+              onPress={handleUpdate}
             >
               <Ionicons
-                name="add-circle"
+                name="save"
                 size={22}
                 color="#fff"
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.primaryActionBtnText}>Create Session</Text>
+              <Text style={styles.primaryActionBtnText}>Update Session</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>

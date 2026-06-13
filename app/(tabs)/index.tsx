@@ -1,6 +1,7 @@
 import type { ActivityItem } from "@/api/ActivityService";
 import ActivityService from "@/api/ActivityService";
-import AttendanceService, { SessionJoinData } from "@/api/AttendanceService";
+import AttendanceService from "@/api/AttendanceService";
+import SessionService, { SessionJoinData } from "@/api/SessionService";
 import { Activity } from "@/components/activity/ActivityItem";
 import { RecentActivity } from "@/components/activity/RecentActivity";
 import { CheckInButton } from "@/components/button/CheckInButton";
@@ -24,7 +25,7 @@ import { formatTime12hr } from "@/utils/timeUtils";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, ScrollView, Text, View, Linking, TouchableOpacity, Platform } from "react-native";
+import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 
 export default function HomeScreen() {
@@ -209,7 +210,7 @@ export default function HomeScreen() {
     // ── SERVER VALIDATION + JOIN ──────────────────────────────────────────────
     // The backend enforces: invalid code → expired → duplicate → success
     try {
-      const result = await AttendanceService.registerAttendance(trimmedQuery);
+      const result = await SessionService.joinSession(trimmedQuery);
       if (!result.success) {
         setSearchError(result.message || "Unable to join session.");
         return;
